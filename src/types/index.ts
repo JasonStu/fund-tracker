@@ -14,9 +14,15 @@ export interface FundHolding {
   nav: number; // 持仓市值（计算得出）
 }
 
+export interface QuarterlyHolding {
+  quarter: string;
+  holdings: FundHolding[];
+}
+
 export interface FundDetail extends Fund {
   holdings: FundHolding[];
   reportDate: string; // 报告日期
+  quarterlyHoldings?: QuarterlyHolding[];
 }
 
 export interface StockRealtime {
