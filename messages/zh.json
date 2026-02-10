@@ -27,6 +27,10 @@
     "time": "估值时间",
     "topHoldingsTitle": "重仓股实时表现",
     "currentValuation": "最新",
+    "performance": "业绩表现",
+    "yield": "收益率",
+    "peerAverage": "同类平均",
+    "hs300": "沪深300",
     "chartTitle": "重仓持股分布",
     "table": {
       "stock": "股票",

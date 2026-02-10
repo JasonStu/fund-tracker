@@ -19,11 +19,25 @@ export interface QuarterlyHolding {
   holdings: FundHolding[];
 }
 
+export interface FundHistoryNAV {
+  date: string;
+  nav: number;
+  accNav: number;
+  changeRate: string;
+}
+
+export interface FundPerformance {
+  netWorthTrend: { x: number; y: number; equityReturn: number; unitMoney: string }[];
+  acWorthTrend: { x: number; y: number }[];
+  grandTotal: { name: string; data: [number, number][] }[]; // Comparison data: [timestamp, value]
+}
+
 export interface FundDetail extends Fund {
   holdings: FundHolding[];
   reportDate: string; // 报告日期
   fundScale?: string; // 基金规模
   quarterlyHoldings?: QuarterlyHolding[];
+  performance?: FundPerformance;
 }
 
 export interface StockRealtime {

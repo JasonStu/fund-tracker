@@ -27,6 +27,10 @@
     "time": "Time",
     "topHoldingsTitle": "Top Holdings Realtime Performance",
     "currentValuation": "Latest",
+    "performance": "Performance",
+    "yield": "Yield",
+    "peerAverage": "Peer Average",
+    "hs300": "HS300",
     "chartTitle": "Top Holdings Distribution",
     "table": {
       "stock": "Stock",

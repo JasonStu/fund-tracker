@@ -42,6 +42,80 @@ const parseHoldingsFromTbody = (tbody: string): FundHolding[] => {
   return holdings;
 };
 
+export interface FundHistoryNAV {
+  date: string;
+  nav: number;
+  accNav: number;
+  changeRate: string;
+}
+
+export interface FundPerformance {
+  netWorthTrend: { x: number; y: number; equityReturn: number; unitMoney: string }[];
+  acWorthTrend: { x: number; y: number }[];
+  grandTotal: { name: string; data: [number, number][] }[]; // Comparison data: [timestamp, value]
+}
+
+export const getFundHistoryNAV = async (code: string, pageSize = 365): Promise<FundHistoryNAV[]> => {
+  const url = `http://api.fund.eastmoney.com/f10/lsjz`;
+  
+  try {
+    const response = await axios.get(url, {
+      params: {
+        fundCode: code,
+        pageIndex: 1,
+        pageSize: pageSize,
+      },
+      headers: {
+        'Referer': 'http://fundf10.eastmoney.com/',
+      }
+    });
+
+    const data = response.data;
+    if (data.Data && data.Data.LSJZList) {
+      return data.Data.LSJZList.map((item: any) => ({
+        date: item.FSRQ,
+        nav: Number(item.DWJZ),
+        accNav: Number(item.LJJZ),
+        changeRate: item.JZZZL
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('Fetch history NAV failed', error);
+    return [];
+  }
+};
+
+export const getFundPerformanceData = async (code: string): Promise<FundPerformance | null> => {
+  const url = `http://fund.eastmoney.com/pingzhongdata/${code}.js`;
+  
+  try {
+    const response = await axios.get(url);
+    const scriptContent = response.data;
+
+    // Extract Net Worth Trend
+    const netWorthMatch = scriptContent.match(/var Data_netWorthTrend = (\[.*?\]);/);
+    const netWorthTrend = netWorthMatch ? JSON.parse(netWorthMatch[1]) : [];
+
+    // Extract AC Worth Trend
+    const acWorthMatch = scriptContent.match(/var Data_ACWorthTrend = (\[.*?\]);/);
+    const acWorthTrend = acWorthMatch ? JSON.parse(acWorthMatch[1]) : [];
+
+    // Extract Grand Total (Benchmark Comparison)
+    const grandTotalMatch = scriptContent.match(/var Data_grandTotal = (\[.*?\]);/);
+    const grandTotal = grandTotalMatch ? JSON.parse(grandTotalMatch[1]) : [];
+    
+    return {
+      netWorthTrend,
+      acWorthTrend,
+      grandTotal
+    };
+  } catch (error) {
+    console.error('Fetch performance data failed', error);
+    return null;
+  }
+};
+
 export const getFundHoldings = async (code: string): Promise<FundDetail> => {
   // 1. Get Fund Basic Info
   const basicInfoUrl = `http://fundgz.1234567.com.cn/js/${code}.js`;
@@ -61,7 +135,10 @@ export const getFundHoldings = async (code: string): Promise<FundDetail> => {
   const scaleUrl = `http://fundf10.eastmoney.com/jbgk_${code}.html`;
   const scalePromise = axios.get(scaleUrl).catch(() => ({ data: '' }));
 
-  const [basicResponse, holdingsResponse, scaleResponse] = await Promise.all([basicInfoPromise, holdingsPromise, scalePromise]);
+  // 4. Get Fund Performance Data
+  const performancePromise = getFundPerformanceData(code);
+
+  const [basicResponse, holdingsResponse, scaleResponse, performanceData] = await Promise.all([basicInfoPromise, holdingsPromise, scalePromise, performancePromise]);
 
   let fundName = '';
   let nav = 0;
@@ -138,6 +215,7 @@ export const getFundHoldings = async (code: string): Promise<FundDetail> => {
     holdings: latest ? latest.holdings : [],
     reportDate: latest ? latest.quarter : '',
     fundScale,
-    quarterlyHoldings
+    quarterlyHoldings,
+    performance: performanceData || undefined
   };
 };
