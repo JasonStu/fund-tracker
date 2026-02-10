@@ -22,6 +22,7 @@ export interface QuarterlyHolding {
 export interface FundDetail extends Fund {
   holdings: FundHolding[];
   reportDate: string; // 报告日期
+  fundScale?: string; // 基金规模
   quarterlyHoldings?: QuarterlyHolding[];
 }
 

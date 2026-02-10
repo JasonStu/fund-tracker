@@ -26,6 +26,7 @@
     "estChange": "估算涨幅",
     "time": "估值时间",
     "topHoldingsTitle": "重仓股实时表现",
+    "currentValuation": "最新",
     "chartTitle": "重仓持股分布",
     "table": {
       "stock": "股票",

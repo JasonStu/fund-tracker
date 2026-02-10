@@ -57,11 +57,16 @@ export const getFundHoldings = async (code: string): Promise<FundDetail> => {
     }
   });
 
-  const [basicResponse, holdingsResponse] = await Promise.all([basicInfoPromise, holdingsPromise]);
+  // 3. Get Fund Scale (EastMoney JBGK Page)
+  const scaleUrl = `http://fundf10.eastmoney.com/jbgk_${code}.html`;
+  const scalePromise = axios.get(scaleUrl).catch(() => ({ data: '' }));
+
+  const [basicResponse, holdingsResponse, scaleResponse] = await Promise.all([basicInfoPromise, holdingsPromise, scalePromise]);
 
   let fundName = '';
   let nav = 0;
   let navDate = '';
+  let fundScale = '';
   
   const basicData = basicResponse.data;
   if (basicData && typeof basicData === 'string') {
@@ -76,6 +81,14 @@ export const getFundHoldings = async (code: string): Promise<FundDetail> => {
         console.error('Parse basic info error', e);
       }
     }
+  }
+
+  const scaleData = scaleResponse.data;
+  if (scaleData && typeof scaleData === 'string') {
+      const scaleMatch = scaleData.match(/<th>净资产规模<\/th><td>(.*?)（/);
+      if (scaleMatch) {
+          fundScale = scaleMatch[1];
+      }
   }
 
   const holdingsData = holdingsResponse.data;
@@ -124,6 +137,7 @@ export const getFundHoldings = async (code: string): Promise<FundDetail> => {
     navDate,
     holdings: latest ? latest.holdings : [],
     reportDate: latest ? latest.quarter : '',
+    fundScale,
     quarterlyHoldings
   };
 };

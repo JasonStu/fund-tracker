@@ -14,6 +14,7 @@ import { SortIcon } from '@/components/SortIcon';
 interface DisplayHolding extends FundHolding {
   realtime?: StockRealtime;
   status?: 'new' | 'removed' | 'unchanged';
+  proportionChange?: number;
 }
 
 type SortField = 'proportion' | 'change' | 'price' | null;
@@ -52,12 +53,12 @@ export default function FundDetailPage() {
         
         if (data.quarterlyHoldings && data.quarterlyHoldings.length > 0) {
           setQuarterlyHoldings(data.quarterlyHoldings);
-          // Default to latest quarter
-          setSelectedQuarter(data.quarterlyHoldings[0].quarter);
+          // Default to 'Latest' tab
+          setSelectedQuarter(LATEST_TAB);
         } else if (data.holdings.length > 0) {
           // Fallback if no quarterly structure (should not happen with new service)
           setQuarterlyHoldings([{ quarter: data.reportDate, holdings: data.holdings }]);
-          setSelectedQuarter(data.reportDate);
+          setSelectedQuarter(LATEST_TAB);
         }
 
         setLoading(false);
@@ -79,11 +80,19 @@ export default function FundDetailPage() {
     return () => clearInterval(interval);
   }, [code, t]);
 
+  const LATEST_TAB = 'Latest';
+
   // Compute Base List (without sorting)
   const baseList = useMemo(() => {
-    if (!selectedQuarter || quarterlyHoldings.length === 0) return [];
+    // If "Latest" tab is selected, use the most recent quarter's holdings
+    // but we will use real-time data for prices/changes.
+    const effectiveQuarter = selectedQuarter === LATEST_TAB 
+      ? quarterlyHoldings[0]?.quarter 
+      : selectedQuarter;
 
-    const currentIndex = quarterlyHoldings.findIndex(q => q.quarter === selectedQuarter);
+    if (!effectiveQuarter || quarterlyHoldings.length === 0) return [];
+
+    const currentIndex = quarterlyHoldings.findIndex(q => q.quarter === effectiveQuarter);
     if (currentIndex === -1) return [];
 
     const currentQ = quarterlyHoldings[currentIndex];
@@ -92,11 +101,18 @@ export default function FundDetailPage() {
     const prevSet = new Set(prevQ?.holdings.map(h => h.stockCode) || []);
     const currentSet = new Set(currentQ.holdings.map(h => h.stockCode));
 
-    // Current holdings with status
-    const currentWithStatus: DisplayHolding[] = currentQ.holdings.map(h => ({
-      ...h,
-      status: !prevSet.has(h.stockCode) && prevQ ? 'new' : 'unchanged'
-    }));
+    // Current holdings with status and proportion change
+    const currentWithStatus: DisplayHolding[] = currentQ.holdings.map(h => {
+      // Find previous holding to compare proportion
+      const prevHolding = prevQ?.holdings.find(p => p.stockCode === h.stockCode);
+      const proportionChange = h.proportion - (prevHolding ? prevHolding.proportion : 0);
+      
+      return {
+        ...h,
+        status: !prevSet.has(h.stockCode) && prevQ ? 'new' : 'unchanged',
+        proportionChange
+      };
+    });
 
     // Removed holdings
     const removedItems: DisplayHolding[] = prevQ 
@@ -104,7 +120,8 @@ export default function FundDetailPage() {
           .filter(h => !currentSet.has(h.stockCode))
           .map(h => ({
             ...h,
-            status: 'removed'
+            status: 'removed',
+            proportionChange: -h.proportion // Removed means change is -proportion
           }))
       : [];
 
@@ -284,6 +301,17 @@ export default function FundDetailPage() {
           <div className="px-6 py-4 border-b border-[#2a2a3a] flex flex-wrap gap-2 items-center justify-between">
             <h3 className="text-lg font-medium text-white">{t('topHoldingsTitle')}</h3>
             <div className="flex gap-2 overflow-x-auto">
+              <button
+                onClick={() => setSelectedQuarter(LATEST_TAB)}
+                className={clsx(
+                  "px-3 py-1 text-xs rounded-full transition-colors whitespace-nowrap",
+                  selectedQuarter === LATEST_TAB
+                    ? "bg-blue-600 text-white"
+                    : "bg-[#2a2a3a] text-gray-400 hover:bg-[#3a3a4a]"
+                )}
+              >
+                {t('currentValuation') || 'Latest'}
+              </button>
               {quarterlyHoldings.map((q) => (
                 <button
                   key={q.quarter}
@@ -316,6 +344,9 @@ export default function FundDetailPage() {
                       {t('table.price')}
                       <SortIcon active={sortField === 'price'} direction={sortDirection} />
                     </div>
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('table.prevClose')}
                   </th>
                   <th 
                     className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-white group"
@@ -359,6 +390,9 @@ export default function FundDetailPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-300">
                         {stock ? stock.currentPrice.toFixed(2) : '-'}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                        {stock ? stock.previousClose.toFixed(2) : '-'}
+                      </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium ${isUp ? 'text-red-500' : 'text-green-500'}`}>
                         {stock ? (
                           <>
@@ -367,7 +401,15 @@ export default function FundDetailPage() {
                         ) : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-300">
-                        {numeral(holding.proportion).format('0.00')}%
+                        <div className="flex flex-col items-end">
+                          <span>{numeral(holding.proportion).format('0.00')}%</span>
+                          {holding.proportionChange !== undefined && holding.proportionChange !== 0 && (
+                            <span className={clsx("text-xs", holding.proportionChange > 0 ? "text-red-500" : "text-green-500")}>
+                              {holding.proportionChange > 0 ? '+' : ''}
+                              {numeral(holding.proportionChange).format('0.00')}%
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-xs">
                         {holding.status === 'new' && (

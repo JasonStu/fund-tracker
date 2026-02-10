@@ -4,10 +4,11 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from '@/i18n/routing';
 import { Combobox } from '@headlessui/react';
-import { CheckIcon, ChevronUpDownIcon, TrashIcon } from '@heroicons/react/20/solid';
-import { FundRealtimeValuation } from '@/types';
+import { CheckIcon, ChevronUpDownIcon, TrashIcon, ChartBarIcon } from '@heroicons/react/20/solid';
+import { FundRealtimeValuation, FundDetail } from '@/types';
 import numeral from 'numeral';
 import { useTranslations } from 'next-intl';
+import FundComparison from '@/components/FundComparison';
 
 const STORAGE_KEY = 'my_funds';
 
@@ -18,6 +19,11 @@ export default function Home() {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // Comparison state
+  const [isComparing, setIsComparing] = useState(false);
+  const [comparisonFunds, setComparisonFunds] = useState<FundDetail[]>([]);
+  const [isComparingLoading, setIsComparingLoading] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -86,8 +92,31 @@ export default function Home() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newFunds));
   };
 
+  const handleCompare = async () => {
+    if (myFunds.length === 0) return;
+    
+    setIsComparingLoading(true);
+    try {
+      const promises = myFunds.map(code => 
+        axios.get(`/api/funds/${code}/holdings`).then(res => res.data)
+      );
+      const results = await Promise.all(promises);
+      setComparisonFunds(results);
+      setIsComparing(true);
+    } catch (e) {
+      console.error('Failed to fetch comparison data', e);
+    } finally {
+      setIsComparingLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <FundComparison 
+        isOpen={isComparing} 
+        onClose={() => setIsComparing(false)} 
+        funds={comparisonFunds} 
+      />
       {/* Search Section */}
       <div className="panel-metal rounded-none p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -159,15 +188,36 @@ export default function Home() {
             </div>
             <h2 className="text-lg font-semibold text-[#e0e0e0]">{t('myPortfolio')}</h2>
           </div>
-          {loading && (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <svg className="w-4 h-4 animate-spin text-[#ff00ff]" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              Loading...
-            </div>
-          )}
+          
+          <div className="flex items-center gap-4">
+            {myFunds.length > 0 && (
+              <button
+                onClick={handleCompare}
+                disabled={isComparingLoading}
+                className="flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a25] border border-[#00ffff] text-[#00ffff] hover:bg-[#00ffff] hover:text-[#1a1a25] transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isComparingLoading ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <ChartBarIcon className="w-4 h-4" />
+                )}
+                Compare
+              </button>
+            )}
+            
+            {loading && (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <svg className="w-4 h-4 animate-spin text-[#ff00ff]" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Loading...
+              </div>
+            )}
+          </div>
         </div>
 
         {myFunds.length === 0 ? (
