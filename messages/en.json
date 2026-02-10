@@ -1,0 +1,38 @@
+{
+  "Navbar": {
+    "title": "Fund Tracker",
+    "dashboard": "Dashboard"
+  },
+  "Home": {
+    "addFund": "Add Fund",
+    "searchPlaceholder": "Search by code or name...",
+    "nothingFound": "Nothing found.",
+    "myPortfolio": "My Portfolio",
+    "noFunds": "No funds added yet. Search above to add.",
+    "table": {
+      "fund": "Fund",
+      "nav": "NAV",
+      "estNav": "Est. NAV",
+      "estChange": "Est. Change",
+      "action": "Action"
+    },
+    "loading": "Loading data..."
+  },
+  "FundDetail": {
+    "loading": "Loading...",
+    "error": "Failed to fetch fund data",
+    "nav": "Net Asset Value (NAV)",
+    "estNav": "Estimated NAV",
+    "estChange": "Est. Change",
+    "time": "Time",
+    "topHoldingsTitle": "Top Holdings Realtime Performance",
+    "chartTitle": "Top Holdings Distribution",
+    "table": {
+      "stock": "Stock",
+      "price": "Price",
+      "change": "Change",
+      "prevClose": "Prev Close",
+      "proportion": "Proportion"
+    }
+  }
+}

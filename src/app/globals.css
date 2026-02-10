@@ -1,26 +1,152 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0f;
+  --foreground: #e0e0e0;
+  --punk-pink: #ff00ff;
+  --punk-cyan: #00ffff;
+  --punk-yellow: #ffff00;
+  --punk-purple: #bf00ff;
+  --punk-red: #ff3333;
+  --punk-green: #33ff33;
+  --panel-bg: #12121a;
+  --panel-border: #2a2a3a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-punk-pink: var(--punk-pink);
+  --color-punk-cyan: var(--punk-cyan);
+  --color-punk-yellow: var(--punk-yellow);
+  --color-punk-purple: var(--punk-purple);
+  --color-punk-red: var(--punk-red);
+  --color-punk-green: var(--punk-green);
+  --color-panel: var(--panel-bg);
+  --color-panel-border: var(--panel-border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, sans-serif;
+}
+
+/* 霓虹文字效果 */
+.text-neon-pink {
+  color: var(--punk-pink);
+  text-shadow: 0 0 10px var(--punk-pink), 0 0 20px var(--punk-pink);
+}
+
+.text-neon-cyan {
+  color: var(--punk-cyan);
+  text-shadow: 0 0 10px var(--punk-cyan), 0 0 20px var(--punk-cyan);
+}
+
+.text-neon-yellow {
+  color: var(--punk-yellow);
+  text-shadow: 0 0 10px var(--punk-yellow);
+}
+
+/* 金属质感面板 */
+.panel-metal {
+  background: linear-gradient(145deg, #1a1a25 0%, #0d0d15 100%);
+  border: 1px solid var(--panel-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* 霓虹边框 */
+.border-neon-pink {
+  border-color: var(--punk-pink);
+  box-shadow: 0 0 10px var(--punk-pink), inset 0 0 10px rgba(255, 0, 255, 0.1);
+}
+
+.border-neon-cyan {
+  border-color: var(--punk-cyan);
+  box-shadow: 0 0 10px var(--punk-cyan);
+}
+
+/* 赛博风格滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--panel-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--panel-border);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--punk-purple);
+}
+
+/* 故障效果文字 */
+.glitch-text {
+  position: relative;
+}
+
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.glitch-text::before {
+  left: 2px;
+  text-shadow: -1px 0 var(--punk-pink);
+  animation: glitch-1 2s infinite linear alternate-reverse;
+}
+
+.glitch-text::after {
+  left: -2px;
+  text-shadow: -1px 0 var(--punk-cyan);
+  animation: glitch-2 3s infinite linear alternate-reverse;
+}
+
+@keyframes glitch-1 {
+  0%, 100% { clip-path: inset(0 0 90% 0); }
+  20% { clip-path: inset(20% 0 60% 0); }
+  40% { clip-path: inset(60% 0 20% 0); }
+  60% { clip-path: inset(10% 0 80% 0); }
+  80% { clip-path: inset(40% 0 40% 0); }
+}
+
+@keyframes glitch-2 {
+  0%, 100% { clip-path: inset(90% 0 0 0); }
+  20% { clip-path: inset(60% 0 30% 0); }
+  40% { clip-path: inset(20% 0 60% 0); }
+  60% { clip-path: inset(80% 0 10% 0); }
+  80% { clip-path: inset(40% 0 40% 0); }
+}
+
+/* 扫描线效果 */
+.scanlines::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.1) 0px,
+    rgba(0, 0, 0, 0.1) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 1000;
 }

@@ -1,0 +1,38 @@
+{
+  "Navbar": {
+    "title": "基金助手",
+    "dashboard": "仪表盘"
+  },
+  "Home": {
+    "addFund": "添加基金",
+    "searchPlaceholder": "输入代码或名称搜索...",
+    "nothingFound": "未找到结果。",
+    "myPortfolio": "我的自选",
+    "noFunds": "暂无自选基金，请在上方搜索添加。",
+    "table": {
+      "fund": "基金名称",
+      "nav": "净值",
+      "estNav": "估算净值",
+      "estChange": "估算涨幅",
+      "action": "操作"
+    },
+    "loading": "加载中..."
+  },
+  "FundDetail": {
+    "loading": "加载中...",
+    "error": "获取数据失败",
+    "nav": "单位净值",
+    "estNav": "估算净值",
+    "estChange": "估算涨幅",
+    "time": "估值时间",
+    "topHoldingsTitle": "重仓股实时表现",
+    "chartTitle": "重仓持股分布",
+    "table": {
+      "stock": "股票",
+      "price": "现价",
+      "change": "涨跌幅",
+      "prevClose": "昨收",
+      "proportion": "持仓占比"
+    }
+  }
+}
