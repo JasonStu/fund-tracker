@@ -9,6 +9,9 @@ import { FundRealtimeValuation, FundDetail } from '@/types';
 import numeral from 'numeral';
 import { useTranslations } from 'next-intl';
 import FundComparison from '@/components/FundComparison';
+import { DndContext, closestCenter, DragEndEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableItem } from '@/components/SortableItem';
 
 const STORAGE_KEY = 'my_funds';
 
@@ -110,6 +113,34 @@ export default function Home() {
     }
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setFundData((items) => {
+        const oldIndex = items.findIndex((item) => item.fundCode === active.id);
+        const newIndex = items.findIndex((item) => item.fundCode === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+
+      setMyFunds((currentIds) => {
+        const oldIndex = currentIds.indexOf(String(active.id));
+        const newIndex = currentIds.indexOf(String(over.id));
+        const newIds = arrayMove(currentIds, oldIndex, newIndex);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newIds));
+        return newIds;
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <FundComparison 
@@ -204,7 +235,7 @@ export default function Home() {
                 ) : (
                   <ChartBarIcon className="w-4 h-4" />
                 )}
-                Compare
+                {t('compare')}
               </button>
             )}
             
@@ -231,66 +262,78 @@ export default function Home() {
           </div>
         ) : (
           <div className="divide-y divide-[#2a2a3a]">
-            {fundData.map((fund) => (
-              <Link
-                key={fund.fundCode}
-                href={`/fund/${fund.fundCode}`}
-                className="flex items-center justify-between px-6 py-4 hover:bg-[#1a1a25] transition-colors group"
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={fundData.map(f => f.fundCode)}
+                strategy={verticalListSortingStrategy}
               >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded flex items-center justify-center border ${
-                    fund.estimatedChange >= 0
-                      ? 'bg-[#1a1a25] border-[#ff3333]'
-                      : 'bg-[#1a1a25] border-[#33ff33]'
-                  }`}>
-                    <svg className={`w-5 h-5 ${
-                      fund.estimatedChange >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
-                    }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      {fund.estimatedChange >= 0 ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                      ) : (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-                      )}
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="font-medium text-[#e0e0e0] group-hover:text-[#00ffff] transition-colors">{fund.fundName}</div>
-                    <div className="text-sm text-gray-500">{fund.fundCode}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <div className="text-sm text-gray-500">{t('table.nav')}</div>
-                    <div className="font-medium text-[#e0e0e0]">{fund.nav}</div>
-                  </div>
-                  <div className="text-right w-24">
-                    <div className="text-sm text-gray-500">{t('table.estNav')}</div>
-                    <div className={`font-semibold ${
-                      fund.estimatedChange >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
-                    }`}>
-                      {numeral(fund.estimatedNav).format('0.0000')}
-                    </div>
-                  </div>
-                  <div className="text-right w-20">
-                    <div className="text-sm text-gray-500">{t('table.estChange')}</div>
-                    <div className={`font-semibold ${
-                      fund.estimatedChange >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
-                    }`}>
-                      {fund.estimatedChange >= 0 ? '+' : ''}{numeral(fund.estimatedChangePercent).format('0.00')}%
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      removeFund(fund.fundCode);
-                    }}
-                    className="p-2 text-gray-500 hover:text-[#ff3333] hover:bg-[#1a1a25] transition-colors"
-                  >
-                    <TrashIcon className="w-5 h-5" />
-                  </button>
-                </div>
-              </Link>
-            ))}
+                {fundData.map((fund) => (
+                  <SortableItem key={fund.fundCode} id={fund.fundCode}>
+                    <Link
+                      href={`/fund/${fund.fundCode}`}
+                      className="flex items-center justify-between px-6 py-4 hover:bg-[#1a1a25] transition-colors group flex-1"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded flex items-center justify-center border ${
+                          fund.estimatedChange >= 0
+                            ? 'bg-[#1a1a25] border-[#ff3333]'
+                            : 'bg-[#1a1a25] border-[#33ff33]'
+                        }`}>
+                          <svg className={`w-5 h-5 ${
+                            fund.estimatedChange >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
+                          }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            {fund.estimatedChange >= 0 ? (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            ) : (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                            )}
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="font-medium text-[#e0e0e0] group-hover:text-[#00ffff] transition-colors">{fund.fundName}</div>
+                          <div className="text-sm text-gray-500">{fund.fundCode}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <div className="text-sm text-gray-500">{t('table.nav')}</div>
+                          <div className="font-medium text-[#e0e0e0]">{fund.nav}</div>
+                        </div>
+                        <div className="text-right w-24">
+                          <div className="text-sm text-gray-500">{t('table.estNav')}</div>
+                          <div className={`font-semibold ${
+                            fund.estimatedChange >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
+                          }`}>
+                            {numeral(fund.estimatedNav).format('0.0000')}
+                          </div>
+                        </div>
+                        <div className="text-right w-20">
+                          <div className="text-sm text-gray-500">{t('table.estChange')}</div>
+                          <div className={`font-semibold ${
+                            fund.estimatedChange >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
+                          }`}>
+                            {fund.estimatedChange >= 0 ? '+' : ''}{numeral(fund.estimatedChangePercent).format('0.00')}%
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            removeFund(fund.fundCode);
+                          }}
+                          className="p-2 text-gray-500 hover:text-[#ff3333] hover:bg-[#1a1a25] transition-colors"
+                        >
+                          <TrashIcon className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </Link>
+                  </SortableItem>
+                ))}
+              </SortableContext>
+            </DndContext>
           </div>
         )}
       </div>
