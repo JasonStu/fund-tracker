@@ -44,6 +44,16 @@ export default function Navbar() {
             >
               {t('dashboard')}
             </Link>
+            <Link
+              href="/editor"
+              className={`px-4 py-2 text-sm font-medium border border-transparent transition-all duration-200 ${
+                pathname === '/editor'
+                  ? 'text-[#00ffff] border-[#00ffff] bg-[rgba(0,255,255,0.1)] shadow-[0_0_10px_rgba(0,255,255,0.3)]'
+                  : 'text-gray-400 hover:text-[#00ffff] hover:border-[#00ffff]/50'
+              }`}
+            >
+              {t('editor')}
+            </Link>
           </div>
 
           {/* Language Switcher */}

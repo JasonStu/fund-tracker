@@ -183,18 +183,29 @@ export const getFundHoldings = async (code: string): Promise<FundDetail> => {
         // Regex to find Date + Table
         // Pattern matches: Date header (either font class='px12' or h4) followed by tbody
         const blockRegex = /(?:<font class='px12'>|<h4[^>]*>)(\d{4}-\d{2}-\d{2})(?:<\/font>|<\/h4>)[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/gi;
-        
+
         let match;
-        while ((match = blockRegex.exec(html)) !== null) {
-            const date = match[1];
-            const tbody = match[2];
-            const holdings = parseHoldingsFromTbody(tbody);
-            if (holdings.length > 0) {
-                // Avoid duplicates if any
-                if (!quarterlyHoldings.find(q => q.quarter === date)) {
-                    quarterlyHoldings.push({ quarter: date, holdings });
-                }
+        let lastIndex = 0;
+        const maxIterations = 100; // Prevent infinite loop
+        let iterations = 0;
+
+        while (iterations < maxIterations) {
+          blockRegex.lastIndex = lastIndex;
+          match = blockRegex.exec(html);
+          if (!match) break;
+
+          iterations++;
+          lastIndex = blockRegex.lastIndex;
+
+          const date = match[1];
+          const tbody = match[2];
+          const holdings = parseHoldingsFromTbody(tbody);
+          if (holdings.length > 0) {
+            // Avoid duplicates if any
+            if (!quarterlyHoldings.find(q => q.quarter === date)) {
+              quarterlyHoldings.push({ quarter: date, holdings });
             }
+          }
         }
       }
     } catch (e) {

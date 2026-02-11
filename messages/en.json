@@ -1,7 +1,8 @@
 {
   "Navbar": {
     "title": "Fund Tracker",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "editor": "Feishu Editor"
   },
   "Home": {
     "addFund": "Add Fund",
@@ -39,6 +40,36 @@
       "change": "Change",
       "prevClose": "Prev Close",
       "proportion": "Proportion"
+    }
+  },
+  "Editor": {
+    "title": "Feishu Bitable Filler",
+    "description": "Parse stock information and automatically fill into Feishu Bitable",
+    "inputTitle": "Input",
+    "previewTitle": "Preview",
+    "inputPlaceholder": "Paste stock information here...\n\nExample:\n300739    明阳电路\n相关板块：PCB元器件\n教学入市区间：21.00-21.20元\n操作策略：盘中低吸；\n第一压力位：22.90元\n支撑位：19.80\n仓位：10%\n投资亮点：...",
+    "parseButton": "Parse Text",
+    "submitButton": "Submit to Feishu",
+    "submitting": "Submitting...",
+    "previewPlaceholder": "Parsed stock information will appear here",
+    "loadSample": "Load Sample",
+    "config": {
+      "configured": "Feishu API configured",
+      "notConfigured": "Feishu API not configured - please set environment variables"
+    },
+    "success": {
+      "submitted": "Successfully added stock {code} to Feishu Bitable"
+    },
+    "error": {
+      "emptyText": "Please enter some text to parse",
+      "invalidFormat": "Invalid format - please check the input format",
+      "submitFailed": "Failed to submit to Feishu",
+      "unknown": "An unknown error occurred"
+    },
+    "formatGuide": {
+      "title": "Input Format Guide",
+      "line1": "First line: Stock Code + Stock Name (separated by space)",
+      "line2": "Subsequent lines: Title: Content format"
     }
   }
 }

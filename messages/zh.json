@@ -1,7 +1,8 @@
 {
   "Navbar": {
     "title": "基金助手",
-    "dashboard": "仪表盘"
+    "dashboard": "仪表盘",
+    "editor": "飞书编辑器"
   },
   "Home": {
     "addFund": "添加基金",
@@ -25,7 +26,7 @@
     "nav": "单位净值",
     "estNav": "估算净值",
     "estChange": "估算涨幅",
-    "time": "估值时间",
+    "time": "时间",
     "topHoldingsTitle": "重仓股实时表现",
     "currentValuation": "最新",
     "performance": "业绩表现",
@@ -39,6 +40,36 @@
       "change": "涨跌幅",
       "prevClose": "昨收",
       "proportion": "持仓占比"
+    }
+  },
+  "Editor": {
+    "title": "飞书多维表格填充",
+    "description": "解析股票信息并自动填充到飞书多维表格",
+    "inputTitle": "输入",
+    "previewTitle": "预览",
+    "inputPlaceholder": "在此粘贴股票信息...\n\n示例：\n300739    明阳电路\n相关板块：PCB元器件\n教学入市区间：21.00-21.20元\n操作策略：盘中低吸；\n第一压力位：22.90元\n支撑位：19.80\n仓位：10%\n投资亮点：...",
+    "parseButton": "解析文本",
+    "submitButton": "提交到飞书",
+    "submitting": "提交中...",
+    "previewPlaceholder": "解析后的股票信息将显示在此处",
+    "loadSample": "加载示例",
+    "config": {
+      "configured": "飞书 API 已配置",
+      "notConfigured": "飞书 API 未配置 - 请设置环境变量"
+    },
+    "success": {
+      "submitted": "成功将股票 {code} 添加到飞书多维表格"
+    },
+    "error": {
+      "emptyText": "请输入要解析的文本",
+      "invalidFormat": "格式无效 - 请检查输入格式",
+      "submitFailed": "提交到飞书失败",
+      "unknown": "发生未知错误"
+    },
+    "formatGuide": {
+      "title": "输入格式指南",
+      "line1": "第一行：股票代码 + 股票名称（空格分隔）",
+      "line2": "后续行：标题: 内容 格式"
     }
   }
 }
