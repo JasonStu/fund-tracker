@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
     const data = response.data;
     
     // Map external data to our internal model
-    const funds = data.Datas.map((item: any) => ({
+    type EastMoneyFundItem = { CODE: string; NAME: string; FundType: string };
+    const funds = (data.Datas as EastMoneyFundItem[]).map((item) => ({
       code: item.CODE,
       name: item.NAME,
       type: item.FundType,

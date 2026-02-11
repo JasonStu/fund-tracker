@@ -72,7 +72,8 @@ export const getFundHistoryNAV = async (code: string, pageSize = 365): Promise<F
 
     const data = response.data;
     if (data.Data && data.Data.LSJZList) {
-      return data.Data.LSJZList.map((item: any) => ({
+      type LSJZItem = { FSRQ: string; DWJZ: string; LJJZ: string; JZZZL: string };
+      return (data.Data.LSJZList as LSJZItem[]).map((item) => ({
         date: item.FSRQ,
         nav: Number(item.DWJZ),
         accNav: Number(item.LJJZ),

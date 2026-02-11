@@ -24,6 +24,7 @@ export default function FundDetailPage() {
   const t = useTranslations('FundDetail');
   const params = useParams();
   const code = params?.code as string;
+  const errorText = useMemo(() => t('error'), [t]);
 
   const LATEST_TAB = 'Latest';
   const PERFORMANCE_TAB = 'Performance';
@@ -73,7 +74,7 @@ export default function FundDetailPage() {
         setLoading(false);
       } catch (err) {
         console.error(err);
-        setError(t('error'));
+        setError(errorText);
         setLoading(false);
       }
     };
@@ -87,7 +88,7 @@ export default function FundDetailPage() {
        } catch (e) { console.error(e); }
     }, 30000);
     return () => clearInterval(interval);
-  }, [code, t]);
+  }, [code, errorText]);
 
   // Compute Base List (without sorting)
   const baseList = useMemo(() => {
@@ -135,29 +136,35 @@ export default function FundDetailPage() {
     return [...currentWithStatus, ...removedItems];
   }, [selectedQuarter, quarterlyHoldings]);
 
+  const codesKey = useMemo(() => {
+    return baseList.map(h => h.stockCode).join(',');
+  }, [baseList]);
+
   // Fetch Realtime Data for displayed stocks
   useEffect(() => {
-    if (baseList.length === 0) return;
+    if (!codesKey) return;
 
     const fetchStockQuotes = async () => {
-      const codes = baseList.map(h => h.stockCode).join(',');
+      const codes = codesKey;
       if (!codes) return;
 
       try {
         const stocksRes = await axios.get(`/api/stocks/realtime?codes=${codes}`);
-        const newMap = new Map(stockRealtimeMap);
-        stocksRes.data.stocks.forEach((s: StockRealtime) => {
-           const simpleCode = s.code.replace(/^(sh|sz|hk|usr_)/, '');
-           newMap.set(simpleCode, s);
+        setStockRealtimeMap((prev) => {
+          const newMap = new Map(prev);
+          stocksRes.data.stocks.forEach((s: StockRealtime) => {
+            const simpleCode = s.code.replace(/^(sh|sz|hk|usr_)/, '');
+            newMap.set(simpleCode, s);
+          });
+          return newMap;
         });
-        setStockRealtimeMap(newMap);
       } catch (e) {
         console.error('Failed to fetch stock quotes', e);
       }
     };
 
     fetchStockQuotes();
-  }, [baseList.map(d => d.stockCode).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [codesKey]);
 
   // Compute Final Display List (Sorted)
   const sortedList = useMemo(() => {
@@ -299,17 +306,6 @@ export default function FundDetailPage() {
     const filteredNetWorth = filterData(performance.netWorthTrend) as {x: number, y: number, equityReturn: number}[];
     if (filteredNetWorth.length === 0) return {};
 
-    // Helper to calculate cumulative return relative to start of period
-    // Formula: (Current_Return - Start_Return)
-    // Note: Since data is percentage, simple subtraction is a reasonable approximation for display
-    // or strictly: ((1 + curr/100) / (1 + start/100) - 1) * 100
-    const calculateRelativeReturn = (data: number[], startValue: number) => {
-      return data.map(val => {
-         // Use precise calculation
-         const ratio = (1 + val / 100) / (1 + startValue / 100);
-         return (ratio - 1) * 100;
-      });
-    };
 
     // Fund Yield Data (Recalculate based on start time)
     // performance.netWorthTrend items have 'equityReturn' which is total return since inception

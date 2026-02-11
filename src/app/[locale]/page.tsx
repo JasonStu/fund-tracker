@@ -14,13 +14,14 @@ import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-ki
 import { SortableItem } from '@/components/SortableItem';
 
 const STORAGE_KEY = 'my_funds';
+type SearchFund = { code: string; name: string; type?: string };
 
 export default function Home() {
   const t = useTranslations('Home');
   const [myFunds, setMyFunds] = useState<string[]>([]);
   const [fundData, setFundData] = useState<FundRealtimeValuation[]>([]);
   const [query, setQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchFund[]>([]);
   const [loading, setLoading] = useState(false);
   
   // Comparison state
@@ -79,8 +80,8 @@ export default function Home() {
     return () => clearTimeout(timeoutId);
   }, [query]);
 
-  const addFund = (fund: any) => {
-    if (!myFunds.includes(fund.code)) {
+  const addFund = (fund: SearchFund | null) => {
+    if (fund && !myFunds.includes(fund.code)) {
       const newFunds = [...myFunds, fund.code];
       setMyFunds(newFunds);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newFunds));
@@ -164,7 +165,8 @@ export default function Home() {
               <div className="relative w-full cursor-pointer overflow-hidden bg-[#0d0d15] border border-[#2a2a3a] hover:border-[#00ffff] transition-colors">
                 <Combobox.Input
                   className="w-full border-none py-3 pl-4 pr-12 text-sm text-[#e0e0e0] placeholder-gray-500 bg-transparent focus:ring-0"
-                  displayValue={(fund: any) => fund?.name || ''}
+                  displayValue={(fund: SearchFund) => fund?.name || ''
+                  }
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={t('searchPlaceholder')}
                 />

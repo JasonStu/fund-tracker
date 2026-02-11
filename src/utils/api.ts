@@ -25,7 +25,7 @@ export const fetchJson = async <T>(url: string): Promise<T> => {
   return response.data;
 };
 
-export const parseSinaStock = (code: string, data: string): Stock | null => {
+export const parseSinaStock = (code: string, data: string): StockRealtime | null => {
   const match = data.match(/="(.*)"/); // Removed ; requirement
   if (!match) return null;
   
@@ -62,8 +62,8 @@ export const parseSinaStock = (code: string, data: string): Stock | null => {
     previousClose,
     change,
     changePercent,
-    // volume: parseFloat(params[8]), // Different for HK/A
-    // updateTime: ...
+    volume: 0,
+    updateTime: new Date().toISOString(),
   };
 };
 
