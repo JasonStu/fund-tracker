@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
+import Link from 'next/link';
 import axios from 'axios';
 import { FundRealtimeValuation, StockRealtime, FundDetail, QuarterlyHolding, FundHolding } from '@/types';
 import { useParams } from 'next/navigation';
 import ReactECharts from 'echarts-for-react';
 import numeral from 'numeral';
 import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/routing';
 import clsx from 'clsx';
 import { SortIcon } from '@/components/SortIcon';
 

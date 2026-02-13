@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
+import { AuthProvider } from '@/components/AuthProvider';
 import Navbar from "@/components/Navbar";
-import "../globals.css";
+import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,26 +21,25 @@ export const metadata: Metadata = {
   description: "Real-time fund valuation tracker",
 };
 
-export default async function LocaleLayout({
+export default async function RootLayout({
   children,
-  params
 }: {
   children: React.ReactNode;
-  params: Promise<{ locale: string }>;
 }) {
-  const { locale } = await params;
   const messages = await getMessages();
 
   return (
-    <html lang={locale}>
+    <html lang="zh">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0a0a0f] scanlines`}
       >
         <NextIntlClientProvider messages={messages}>
-          <Navbar />
-          <main className="max-w-5xl mx-auto px-4 py-8">
-            {children}
-          </main>
+          <AuthProvider>
+            <Navbar />
+            <main className="max-w-5xl mx-auto px-4 py-8">
+              {children}
+            </main>
+          </AuthProvider>
         </NextIntlClientProvider>
       </body>
     </html>

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import axios from 'axios';
-import { Link } from '@/i18n/routing';
 import { Combobox } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon, TrashIcon, ChartBarIcon } from '@heroicons/react/20/solid';
 import { FundRealtimeValuation, FundDetail } from '@/types';

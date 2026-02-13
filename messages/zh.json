@@ -2,7 +2,9 @@
   "Navbar": {
     "title": "基金助手",
     "dashboard": "仪表盘",
-    "editor": "飞书编辑器"
+    "editor": "飞书编辑器",
+    "login": "登录",
+    "logout": "登出"
   },
   "Home": {
     "addFund": "添加基金",
@@ -71,6 +73,85 @@
       "title": "输入格式指南",
       "line1": "第一行：股票代码 + 股票名称（空格分隔）",
       "line2": "后续行：标题: 内容 格式"
+    }
+  },
+  "Login": {
+    "title": "登录",
+    "description": "输入您的凭据以访问您的账户",
+    "email": "邮箱",
+    "emailPlaceholder": "请输入邮箱",
+    "password": "密码",
+    "passwordPlaceholder": "请输入密码",
+    "submit": "登录",
+    "loading": "登录中...",
+    "noAccount": "没有账户？",
+    "registerLink": "使用邀请码注册",
+    "error": {
+      "invalidCredentials": "邮箱或密码错误",
+      "unknown": "发生未知错误"
+    }
+  },
+  "Register": {
+    "title": "创建账户",
+    "description": "使用邀请码注册",
+    "invitationCode": "邀请码",
+    "codePlaceholder": "请输入邀请码",
+    "email": "邮箱",
+    "emailPlaceholder": "请输入邮箱",
+    "password": "密码",
+    "passwordPlaceholder": "至少8个字符",
+    "confirmPassword": "确认密码",
+    "confirmPasswordPlaceholder": "请再次输入密码",
+    "submit": "创建账户",
+    "continue": "继续",
+    "validating": "验证中...",
+    "registering": "创建账户中...",
+    "back": "返回",
+    "hasAccount": "已有账户？",
+    "loginLink": "立即登录",
+    "error": {
+      "noCode": "请输入邀请码",
+      "invalidCode": "邀请码无效或已过期",
+      "passwordMismatch": "两次输入的密码不一致",
+      "passwordTooShort": "密码至少需要8个字符",
+      "registerFailed": "注册失败",
+      "unknown": "发生未知错误"
+    }
+  },
+  "Admin": {
+    "title": "邀请码管理",
+    "createTitle": "创建邀请码",
+    "codeLabel": "邀请码（可选）",
+    "codePlaceholder": "留空自动生成",
+    "expiresLabel": "过期时间（可选）",
+    "create": "创建",
+    "creating": "创建中...",
+    "listTitle": "邀请码列表",
+    "noInvitations": "暂无邀请码",
+    "loading": "加载中...",
+    "accessDenied": "访问被拒绝",
+    "delete": "删除",
+    "deleteConfirm": "确定要删除此邀请码吗？",
+    "copy": "复制到剪贴板",
+    "table": {
+      "code": "邀请码",
+      "status": "状态",
+      "usedBy": "使用者",
+      "createdAt": "创建时间",
+      "expiresAt": "过期时间",
+      "actions": "操作"
+    },
+    "status": {
+      "active": "可用",
+      "used": "已使用",
+      "expired": "已过期",
+      "disabled": "已禁用"
+    },
+    "error": {
+      "fetchFailed": "获取邀请码列表失败",
+      "createFailed": "创建邀请码失败",
+      "deleteFailed": "删除邀请码失败",
+      "unknown": "发生未知错误"
     }
   }
 }
