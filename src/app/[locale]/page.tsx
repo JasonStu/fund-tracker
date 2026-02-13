@@ -96,6 +96,12 @@ export default function Home() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newFunds));
   };
 
+  const handleClearAll = () => {
+    setMyFunds([]);
+    setFundData([]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  };
+
   const handleCompare = async () => {
     if (myFunds.length === 0) return;
     
@@ -164,12 +170,26 @@ export default function Home() {
             <div className="relative">
               <div className="relative w-full cursor-pointer overflow-hidden bg-[#0d0d15] border border-[#2a2a3a] hover:border-[#00ffff] transition-colors">
                 <Combobox.Input
-                  className="w-full border-none py-3 pl-4 pr-12 text-sm text-[#e0e0e0] placeholder-gray-500 bg-transparent focus:ring-0"
+                  className="w-full border-none py-3 pl-4 pr-20 text-sm text-[#e0e0e0] placeholder-gray-500 bg-transparent focus:ring-0"
                   displayValue={(fund: SearchFund) => fund?.name || ''
                   }
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={t('searchPlaceholder')}
                 />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery('');
+                      setSearchResults([]);
+                    }}
+                    className="absolute inset-y-0 right-10 flex items-center pr-1 text-gray-500 hover:text-[#e0e0e0] transition-colors"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
                 <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-3">
                   <ChevronUpDownIcon className="h-5 w-5 text-gray-500" />
                 </Combobox.Button>
@@ -224,21 +244,30 @@ export default function Home() {
           
           <div className="flex items-center gap-4">
             {myFunds.length > 0 && (
-              <button
-                onClick={handleCompare}
-                disabled={isComparingLoading}
-                className="flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a25] border border-[#00ffff] text-[#00ffff] hover:bg-[#00ffff] hover:text-[#1a1a25] transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isComparingLoading ? (
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                ) : (
-                  <ChartBarIcon className="w-4 h-4" />
-                )}
-                {t('compare')}
-              </button>
+              <>
+                <button
+                  onClick={handleClearAll}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a25] border border-[#ff3333] text-[#ff3333] hover:bg-[#ff3333] hover:text-[#1a1a25] transition-colors text-sm font-medium"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                  {t('clearAll')}
+                </button>
+                <button
+                  onClick={handleCompare}
+                  disabled={isComparingLoading}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a25] border border-[#00ffff] text-[#00ffff] hover:bg-[#00ffff] hover:text-[#1a1a25] transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isComparingLoading ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    <ChartBarIcon className="w-4 h-4" />
+                  )}
+                  {t('compare')}
+                </button>
+              </>
             )}
             
             {loading && (
