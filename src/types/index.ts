@@ -73,18 +73,22 @@ export interface FundRealtimeValuation {
 
 export interface UserFund {
   id: string;
-  userId: string;
-  fundCode: string;
+  user_id: string;
+  fund_code: string;
+  fund_name: string;
   shares: number;
   cost: number;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserFundWithValue extends UserFund {
-  fundName: string;
-  currentNav: number;
+  nav: number;
+  estimatedNav: number;
+  estimatedChange: number;
+  estimatedChangePercent: number;
   currentValue: number;
+  totalCost: number;
   profit: number;
   profitPercent: number;
 }
