@@ -1,93 +1,47 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import axios from 'axios';
 import { Combobox } from '@headlessui/react';
-import { CheckIcon, ChevronUpDownIcon, TrashIcon, ChartBarIcon } from '@heroicons/react/20/solid';
-import { FundRealtimeValuation, FundDetail, UserFundWithValue } from '@/types';
-import numeral from 'numeral';
+import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
+import { Position } from '@/types';
 import { useTranslations } from 'next-intl';
-import FundComparison from '@/components/FundComparison';
-import { DndContext, closestCenter, DragEndEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
-import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { SortableItem } from '@/components/SortableItem';
+import PositionCard from '@/components/PositionCard';
+import TransactionModal from '@/components/TransactionModal';
 import AddFundModal from '@/components/AddFundModal';
 
 type SearchFund = { code: string; name: string; type?: string };
 
+interface SelectedPosition {
+  id: string;
+  fund_code: string;
+  fund_name: string;
+  nav: number;
+}
+
 export default function Home() {
   const t = useTranslations('Home');
-  const [userFunds, setUserFunds] = useState<UserFundWithValue[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [pendingFund, setPendingFund] = useState<SearchFund | null>(null);
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchFund[]>([]);
   const [loading, setLoading] = useState(false);
+  const [txModalOpen, setTxModalOpen] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<SelectedPosition | null>(null);
 
-  // Comparison state
-  const [isComparing, setIsComparing] = useState(false);
-  const [comparisonFunds, setComparisonFunds] = useState<FundDetail[]>([]);
-  const [isComparingLoading, setIsComparingLoading] = useState(false);
-
-  useEffect(() => {
-    const fetchUserFunds = async () => {
-      try {
-        const res = await axios.get('/api/user-funds');
-        setUserFunds(res.data || []);
-      } catch (e) {
-        console.error('Failed to fetch user funds', e);
-      }
-    };
-    fetchUserFunds();
-  }, []);
-
-  useEffect(() => {
-    if (userFunds.length === 0) {
-      return;
+  // Fetch positions from API
+  const fetchPositions = async () => {
+    try {
+      const res = await axios.get('/api/user-funds');
+      setPositions(res.data.positions || []);
+    } catch (e) {
+      console.error('Failed to fetch positions', e);
     }
+  };
 
-    const fetchData = async () => {
-      setLoading(true);
-      const promises = userFunds.map(fund =>
-        axios.get(`/api/funds/realtime?code=${fund.fund_code}`).then(res => res.data).catch(() => null)
-      );
-
-      const results = await Promise.all(promises);
-      const realtimeData = results.filter(r => r !== null) as FundRealtimeValuation[];
-
-      // Merge realtime data with user fund data
-      const mergedData = userFunds.map(userFund => {
-        const realtime = realtimeData.find(r => r.fundCode === userFund.fund_code);
-        if (!realtime) return null;
-
-        const nav = realtime.nav || 0;
-        const estimatedNav = realtime.estimatedNav || 0;
-        const currentValue = userFund.shares * estimatedNav;
-        const totalCost = userFund.shares * userFund.cost;
-        const profit = currentValue - totalCost;
-        const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
-
-        return {
-          ...userFund,
-          nav,
-          estimatedNav,
-          estimatedChange: realtime.estimatedChange,
-          estimatedChangePercent: realtime.estimatedChangePercent,
-          currentValue,
-          totalCost,
-          profit,
-          profitPercent,
-        };
-      }).filter(Boolean) as UserFundWithValue[];
-
-      setUserFunds(mergedData);
-      setLoading(false);
-    };
-
-    fetchData();
-    const intervalId = setInterval(fetchData, 30000);
-    return () => clearInterval(intervalId);
+  useEffect(() => {
+    fetchPositions();
   }, []);
 
   useEffect(() => {
@@ -119,7 +73,6 @@ export default function Home() {
 
   const handleAddFundConfirm = async ({ shares, cost }: { shares: number; cost: number }) => {
     if (!pendingFund) return;
-    console.log('Adding fund:', { code: pendingFund.code, name: pendingFund.name, shares, cost });
     try {
       await axios.post('/api/user-funds', {
         fund_code: String(pendingFund.code || ''),
@@ -127,8 +80,7 @@ export default function Home() {
         shares: Number(shares) || 0,
         cost: Number(cost) || 0
       });
-      const res = await axios.get('/api/user-funds');
-      setUserFunds(res.data || []);
+      await fetchPositions();
     } catch (e: any) {
       console.error('Failed to add fund', e?.response?.data || e.message);
     }
@@ -139,57 +91,54 @@ export default function Home() {
   const removeFund = async (id: string) => {
     try {
       await axios.delete(`/api/user-funds/${id}`);
-      setUserFunds(prev => prev.filter(f => f.id !== id));
+      setPositions(prev => prev.filter(f => f.id !== id));
     } catch (e) {
       console.error('Failed to remove fund', e);
     }
   };
 
-  const handleCompare = async () => {
-    if (userFunds.length === 0) return;
-
-    setIsComparingLoading(true);
-    try {
-      const promises = userFunds.map(fund =>
-        axios.get(`/api/funds/${fund.fund_code}/holdings`).then(res => res.data)
-      );
-      const results = await Promise.all(promises);
-      setComparisonFunds(results);
-      setIsComparing(true);
-    } catch (e) {
-      console.error('Failed to fetch comparison data', e);
-    } finally {
-      setIsComparingLoading(false);
+  const handleAddPosition = (fundCode: string, fundName: string) => {
+    const position = positions.find(p => p.fund_code === fundCode);
+    if (position) {
+      setSelectedPosition({
+        id: position.id,
+        fund_code: fundCode,
+        fund_name: fundName,
+        nav: position.estimatedNav || position.nav || 0,
+      });
+      setTxModalOpen(true);
     }
   };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  );
+  const handleViewHistory = (fundCode: string) => {
+    console.log('View history for:', fundCode);
+  };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (over && active.id !== over.id) {
-      setUserFunds((items) => {
-        const oldIndex = items.findIndex((item) => item.fund_code === active.id);
-        const newIndex = items.findIndex((item) => item.fund_code === over.id);
-        return arrayMove(items, oldIndex, newIndex);
+  const handleTransactionSubmit = async (data: {
+    type: 'buy' | 'sell';
+    shares: number;
+    price: number;
+    notes?: string;
+  }) => {
+    if (!selectedPosition) return;
+    try {
+      await axios.post('/api/user-funds/transactions', {
+        fund_id: selectedPosition.id,
+        type: data.type,
+        shares: data.shares,
+        price: data.price,
+        notes: data.notes,
       });
+      await fetchPositions();
+    } catch (e) {
+      console.error('Failed to submit transaction', e);
     }
+    setTxModalOpen(false);
+    setSelectedPosition(null);
   };
 
   return (
     <div className="space-y-6">
-      <FundComparison
-        isOpen={isComparing}
-        onClose={() => setIsComparing(false)}
-        funds={comparisonFunds}
-      />
       {/* Search Section */}
       <div className="panel-metal rounded-none p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -277,40 +226,18 @@ export default function Home() {
             <h2 className="text-lg font-semibold text-[#e0e0e0]">{t('myPortfolio')}</h2>
           </div>
 
-          <div className="flex items-center gap-4">
-            {userFunds.length > 0 && (
-              <>
-                <button
-                  onClick={handleCompare}
-                  disabled={isComparingLoading}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a25] border border-[#00ffff] text-[#00ffff] hover:bg-[#00ffff] hover:text-[#1a1a25] transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isComparingLoading ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  ) : (
-                    <ChartBarIcon className="w-4 h-4" />
-                  )}
-                  {t('compare')}
-                </button>
-              </>
-            )}
-
-            {loading && (
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <svg className="w-4 h-4 animate-spin text-[#ff00ff]" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Loading...
-              </div>
-            )}
-          </div>
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <svg className="w-4 h-4 animate-spin text-[#ff00ff]" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Loading...
+            </div>
+          )}
         </div>
 
-        {userFunds.length === 0 ? (
+        {positions.length === 0 ? (
           <div className="p-12 text-center">
             <div className="w-16 h-16 bg-[#1a1a25] border border-[#2a2a3a] rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -320,92 +247,15 @@ export default function Home() {
             <p className="text-gray-500">{t('noFunds')}</p>
           </div>
         ) : (
-          <div className="divide-y divide-[#2a2a3a]">
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={userFunds.map(f => f.fund_code)}
-                strategy={verticalListSortingStrategy}
-              >
-                {userFunds.map((fund) => (
-                  <SortableItem key={fund.fund_code} id={fund.fund_code}>
-                    <Link
-                      href={`/fund/${fund.fund_code}`}
-                      className="flex items-center justify-between px-6 py-4 hover:bg-[#1a1a25] transition-colors group flex-1"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded flex items-center justify-center border ${
-                          fund.estimatedChange >= 0
-                            ? 'bg-[#1a1a25] border-[#ff3333]'
-                            : 'bg-[#1a1a25] border-[#33ff33]'
-                        }`}>
-                          <svg className={`w-5 h-5 ${
-                            fund.estimatedChange >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
-                          }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            {fund.estimatedChange >= 0 ? (
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                            ) : (
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-                            )}
-                          </svg>
-                        </div>
-                        <div>
-                          <div className="font-medium text-[#e0e0e0] group-hover:text-[#00ffff] transition-colors">{fund.fund_name}</div>
-                          <div className="text-sm text-gray-500">{fund.fund_code}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-6">
-                        {/* Shares */}
-                        <div className="text-right w-20">
-                          <div className="text-xs text-gray-500">持有份额</div>
-                          <div className="text-sm text-[#e0e0e0]">{numeral(fund.shares).format('0,0.0000')}</div>
-                        </div>
-                        {/* Cost */}
-                        <div className="text-right w-20">
-                          <div className="text-xs text-gray-500">成本价</div>
-                          <div className="text-sm text-[#e0e0e0]">{numeral(fund.cost).format('0.000000')}</div>
-                        </div>
-                        {/* Current Value */}
-                        <div className="text-right w-24">
-                          <div className="text-xs text-gray-500">当前市值</div>
-                          <div className="text-sm text-[#e0e0e0]">{numeral(fund.currentValue).format('0,0.00')}</div>
-                        </div>
-                        {/* Profit */}
-                        <div className="text-right w-20">
-                          <div className="text-xs text-gray-500">累计收益</div>
-                          <div className={`text-sm font-semibold ${
-                            fund.profit >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
-                          }`}>
-                            {fund.profit >= 0 ? '+' : ''}{numeral(fund.profit).format('0,0.00')}
-                          </div>
-                        </div>
-                        {/* Profit Percent */}
-                        <div className="text-right w-16">
-                          <div className="text-xs text-gray-500">收益率</div>
-                          <div className={`text-sm font-semibold ${
-                            fund.profitPercent >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
-                          }`}>
-                            {fund.profitPercent >= 0 ? '+' : ''}{numeral(fund.profitPercent).format('0.00')}%
-                          </div>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            removeFund(fund.id);
-                          }}
-                          className="p-2 text-gray-500 hover:text-[#ff3333] hover:bg-[#1a1a25] transition-colors"
-                        >
-                          <TrashIcon className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </Link>
-                  </SortableItem>
-                ))}
-              </SortableContext>
-            </DndContext>
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {positions.map((position) => (
+              <PositionCard
+                key={position.id}
+                position={position}
+                onAddPosition={handleAddPosition}
+                onViewHistory={handleViewHistory}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -419,6 +269,20 @@ export default function Home() {
         onSubmit={handleAddFundConfirm}
         fundName={pendingFund?.name || ''}
         fundCode={pendingFund?.code || ''}
+      />
+
+      <TransactionModal
+        isOpen={txModalOpen}
+        onClose={() => {
+          setTxModalOpen(false);
+          setSelectedPosition(null);
+        }}
+        onSubmit={handleTransactionSubmit}
+        fund={{
+          fund_code: selectedPosition?.fund_code || '',
+          fund_name: selectedPosition?.fund_name || '',
+        }}
+        currentNav={selectedPosition?.nav || 0}
       />
     </div>
   );
