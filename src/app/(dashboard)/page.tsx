@@ -9,6 +9,23 @@ import numeral from 'numeral';
 import { useTranslations } from 'next-intl';
 import TransactionModal from '@/components/TransactionModal';
 import AddFundModal from '@/components/AddFundModal';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 type SearchFund = { code: string; name: string; type?: string };
 
@@ -17,6 +34,136 @@ interface SelectedPosition {
   fund_code: string;
   fund_name: string;
   nav: number;
+}
+
+// Sortable Item Component
+function SortablePositionItem({
+  position,
+  onAddPosition,
+  onRemove,
+}: {
+  position: Position;
+  onAddPosition: (fundCode: string, fundName: string) => void;
+  onRemove: (positionId: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: position.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const nav = position.estimatedNav || position.nav || 0;
+  const currentValue = position.shares * nav;
+  const totalCost = position.shares * position.avg_cost;
+  const profit = currentValue - totalCost;
+  const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center justify-between px-6 py-4 hover:bg-[#1a1a25] transition-colors group bg-[#0d0d15]"
+    >
+      {/* Drag Handle */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing p-2 text-gray-500 hover:text-[#00ffff] transition-colors"
+        title="拖拽排序"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+        </svg>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className={`w-10 h-10 rounded flex items-center justify-center border ${
+          profit >= 0
+            ? 'bg-[#1a1a25] border-[#ff3333]'
+            : 'bg-[#1a1a25] border-[#33ff33]'
+        }`}>
+          <svg className={`w-5 h-5 ${
+            profit >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
+          }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            {profit >= 0 ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+            )}
+          </svg>
+        </div>
+        <div>
+          <div className="font-medium text-[#e0e0e0] group-hover:text-[#00ffff] transition-colors">
+            {position.fund_name}
+          </div>
+          <div className="text-sm text-gray-500">{position.fund_code}</div>
+        </div>
+      </div>
+      <div className="flex items-center gap-6">
+        <div className="text-right w-20">
+          <div className="text-xs text-gray-500">持有份额</div>
+          <div className="text-sm text-[#e0e0e0]">{numeral(position.shares).format('0,0.0000')}</div>
+        </div>
+        <div className="text-right w-20">
+          <div className="text-xs text-gray-500">成本价</div>
+          <div className="text-sm text-[#e0e0e0]">{numeral(position.avg_cost).format('0.000000')}</div>
+        </div>
+        <div className="text-right w-24">
+          <div className="text-xs text-gray-500">当前净值</div>
+          <div className="text-sm text-[#e0e0e0]">{numeral(nav).format('0.0000')}</div>
+        </div>
+        <div className="text-right w-24">
+          <div className="text-xs text-gray-500">当前市值</div>
+          <div className="text-sm text-[#e0e0e0]">{numeral(currentValue).format('0,0.00')}</div>
+        </div>
+        <div className="text-right w-20">
+          <div className="text-xs text-gray-500">累计收益</div>
+          <div className={`text-sm font-semibold ${
+            profit >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
+          }`}>
+            {profit >= 0 ? '+' : ''}{numeral(profit).format('0,0.00')}
+          </div>
+        </div>
+        <div className="text-right w-16">
+          <div className="text-xs text-gray-500">收益率</div>
+          <div className={`text-sm font-semibold ${
+            profitPercent >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
+          }`}>
+            {profitPercent >= 0 ? '+' : ''}{numeral(profitPercent).format('0.00')}%
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onAddPosition(position.fund_code, position.fund_name)}
+            className="p-2 text-gray-500 hover:text-[#00ffff] hover:bg-[#1a1a25] rounded transition-colors"
+            title="加减仓"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+          <button
+            onClick={() => onRemove(position.id)}
+            className="p-2 text-gray-500 hover:text-[#ff3333] hover:bg-[#1a1a25] rounded transition-colors"
+            title="删除"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function Home() {
@@ -29,6 +176,43 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [txModalOpen, setTxModalOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<SelectedPosition | null>(null);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle drag end - save new sort order to API
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = positions.findIndex((p) => p.id === active.id);
+      const newIndex = positions.findIndex((p) => p.id === over.id);
+
+      const newPositions = arrayMove(positions, oldIndex, newIndex);
+      setPositions(newPositions);
+
+      // Save new sort order to API
+      try {
+        await axios.put('/api/user-funds/sort', newPositions.map((p, index) => ({
+          id: p.id,
+          sort_order: index,
+        })));
+      } catch (e) {
+        console.error('Failed to save sort order', e);
+        // Revert on error
+        await fetchPositions();
+      }
+    }
+  };
 
   // Fetch positions from API
   const fetchPositions = async () => {
@@ -250,100 +434,27 @@ export default function Home() {
             <p className="text-gray-500">{t('noFunds')}</p>
           </div>
         ) : (
-          <div className="divide-y divide-[#2a2a3a]">
-            {positions.map((position) => {
-              const nav = position.estimatedNav || position.nav || 0;
-              const currentValue = position.shares * nav;
-              const totalCost = position.shares * position.avg_cost;
-              const profit = currentValue - totalCost;
-              const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
-
-              return (
-                <div
-                  key={position.id}
-                  className="flex items-center justify-between px-6 py-4 hover:bg-[#1a1a25] transition-colors group"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded flex items-center justify-center border ${
-                      profit >= 0
-                        ? 'bg-[#1a1a25] border-[#ff3333]'
-                        : 'bg-[#1a1a25] border-[#33ff33]'
-                    }`}>
-                      <svg className={`w-5 h-5 ${
-                        profit >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
-                      }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        {profit >= 0 ? (
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        ) : (
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-                        )}
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="font-medium text-[#e0e0e0] group-hover:text-[#00ffff] transition-colors">
-                        {position.fund_name}
-                      </div>
-                      <div className="text-sm text-gray-500">{position.fund_code}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-right w-20">
-                      <div className="text-xs text-gray-500">持有份额</div>
-                      <div className="text-sm text-[#e0e0e0]">{numeral(position.shares).format('0,0.0000')}</div>
-                    </div>
-                    <div className="text-right w-20">
-                      <div className="text-xs text-gray-500">成本价</div>
-                      <div className="text-sm text-[#e0e0e0]">{numeral(position.avg_cost).format('0.000000')}</div>
-                    </div>
-                    <div className="text-right w-24">
-                      <div className="text-xs text-gray-500">当前净值</div>
-                      <div className="text-sm text-[#e0e0e0]">{numeral(nav).format('0.0000')}</div>
-                    </div>
-                    <div className="text-right w-24">
-                      <div className="text-xs text-gray-500">当前市值</div>
-                      <div className="text-sm text-[#e0e0e0]">{numeral(currentValue).format('0,0.00')}</div>
-                    </div>
-                    <div className="text-right w-20">
-                      <div className="text-xs text-gray-500">累计收益</div>
-                      <div className={`text-sm font-semibold ${
-                        profit >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
-                      }`}>
-                        {profit >= 0 ? '+' : ''}{numeral(profit).format('0,0.00')}
-                      </div>
-                    </div>
-                    <div className="text-right w-16">
-                      <div className="text-xs text-gray-500">收益率</div>
-                      <div className={`text-sm font-semibold ${
-                        profitPercent >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
-                      }`}>
-                        {profitPercent >= 0 ? '+' : ''}{numeral(profitPercent).format('0.00')}%
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleAddPosition(position.fund_code, position.fund_name)}
-                        className="p-2 text-gray-500 hover:text-[#00ffff] hover:bg-[#1a1a25] rounded transition-colors"
-                        title="加减仓"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleRemoveFund(position.id)}
-                        className="p-2 text-gray-500 hover:text-[#ff3333] hover:bg-[#1a1a25] rounded transition-colors"
-                        title="删除"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={positions.map(p => p.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="divide-y divide-[#2a2a3a]">
+                {positions.map((position) => (
+                  <SortablePositionItem
+                    key={position.id}
+                    position={position}
+                    onAddPosition={handleAddPosition}
+                    onRemove={handleRemoveFund}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
