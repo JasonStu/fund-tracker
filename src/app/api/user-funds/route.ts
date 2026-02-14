@@ -82,12 +82,12 @@ export async function GET() {
       );
     }
 
-    // Aggregate position data by fund_id
+    // Aggregate position data by fund_code (since fund_transactions uses fund_code, not fund_id)
     const positionMap = new Map<string, Position>();
 
     // Initialize positions from user_funds
     for (const fund of userFunds) {
-      positionMap.set(fund.id, {
+      positionMap.set(fund.fund_code, {
         id: fund.id,
         user_id: fund.user_id,
         fund_code: fund.fund_code,
@@ -104,7 +104,7 @@ export async function GET() {
 
     // Aggregate transactions
     for (const tx of transactions || []) {
-      const position = positionMap.get(tx.fund_id);
+      const position = positionMap.get(tx.fund_code);
       if (!position) continue;
 
       const txShares = Number(tx.shares) || 0;
@@ -396,13 +396,11 @@ export async function POST(request: Request) {
         .from('fund_transactions')
         .insert({
           user_id: userId,
-          fund_id: newFund.id,
           fund_code: fund_code.trim(),
           fund_name: fund_name || null,
           transaction_type: 'buy',
           shares,
           price: cost,
-          total_amount: shares * cost,
           notes: 'Initial position',
         });
 
