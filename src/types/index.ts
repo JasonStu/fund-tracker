@@ -103,6 +103,13 @@ export interface Position {
   avg_cost: number;
   total_buy: number;
   total_sell: number;
+  nav: number;
+  estimatedNav: number;
+  estimatedChange: number;
+  estimatedChangePercent: number;
+  currentValue: number;
+  profit: number;
+  profitPercent: number;
   created_at: string;
   updated_at: string;
 }
