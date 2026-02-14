@@ -128,3 +128,27 @@ alter table public.user_funds enable row level security;
 create policy "Users can manage own funds"
   on public.user_funds for all
   using (auth.uid() = user_id);
+
+-- 13. Create fund_transactions table for buy/sell records
+create table if not exists public.fund_transactions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  fund_code varchar(20) not null,
+  fund_name text,
+  transaction_type varchar(10) not null check (transaction_type in ('buy', 'sell')),
+  shares numeric(18, 4) not null,
+  price numeric(18, 6) not null,
+  notes text,
+  created_at timestamp with time zone default now()
+);
+
+-- 14. Enable RLS on fund_transactions
+alter table public.fund_transactions enable row level security;
+
+-- 15. Create RLS policy for fund_transactions
+create policy "Users can manage own transactions"
+  on public.fund_transactions for all
+  using (auth.uid() = user_id);
+
+-- 16. Add sort_order column to user_funds
+alter table public.user_funds add column if not exists sort_order integer;
