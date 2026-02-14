@@ -262,16 +262,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Insert into user_funds table
-    console.log('Inserting fund:', { fund_code, fund_name, shares, cost, sort_order: newSortOrder });
+    // Insert into user_funds table (shares/cost now tracked via transactions only)
+    console.log('Inserting fund:', { fund_code, fund_name, sort_order: newSortOrder });
     const { data: newFund, error: insertError } = await supabase
       .from('user_funds')
       .insert({
         user_id: userId,
         fund_code: fund_code.trim(),
         fund_name: fund_name || null,
-        shares: 0, // Always start with 0, we'll create a transaction for initial shares
-        cost: 0,
         sort_order: newSortOrder,
       })
       .select()

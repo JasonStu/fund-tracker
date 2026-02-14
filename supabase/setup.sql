@@ -108,13 +108,13 @@ create trigger on_auth_user_created
 -- on conflict (id) do update set role = 'admin';
 
 -- 10. Create user_funds table for storing user fund holdings
+-- Note: shares and cost are now tracked in fund_transactions table
 create table if not exists public.user_funds (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references auth.users(id) on delete cascade not null,
   fund_code varchar(20) not null,
   fund_name text,
-  shares numeric(18, 4) not null default 0,
-  cost numeric(18, 6) not null default 0,
+  sort_order integer default 0,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now(),
   unique(user_id, fund_code)
