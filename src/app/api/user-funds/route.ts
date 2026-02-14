@@ -147,6 +147,16 @@ export async function GET() {
         .filter(tx => tx.fund_code === position.fund_code)
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
+      console.log(`[DEBUG] Fund ${position.fund_code}:`, {
+        txCount: fundTransactions.length,
+        transactions: fundTransactions.map(tx => ({
+          type: tx.transaction_type,
+          shares: tx.shares,
+          price: tx.price,
+          created: tx.created_at
+        }))
+      });
+
       // FIFO calculation: track buy lots
       type BuyLot = { shares: number; cost: number; pricePerShare: number };
       const buyLots: BuyLot[] = [];
@@ -191,6 +201,19 @@ export async function GET() {
       // Calculate remaining cost basis and average cost
       const remainingCost = buyLots.reduce((sum, lot) => sum + lot.cost, 0);
       const avgCost = currentShares > 0 ? remainingCost / currentShares : 0;
+
+      console.log(`[DEBUG] Fund ${position.fund_code} FIFO result:`, {
+        shares: currentShares,
+        avgCost,
+        remainingCost,
+        totalBuy,
+        totalSell,
+        buyLots: buyLots.map(lot => ({
+          shares: lot.shares,
+          cost: lot.cost,
+          pricePerShare: lot.pricePerShare
+        }))
+      });
 
       const currentValue = currentShares * valuation.estimatedNav;
       const profit = currentValue - remainingCost;
