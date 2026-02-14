@@ -111,11 +111,11 @@ function SortablePositionItem({
       <div className="flex items-center gap-6">
         <div className="text-right w-20">
           <div className="text-xs text-gray-500">持有份额</div>
-          <div className="text-sm text-[#e0e0e0]">{numeral(position.shares).format('0,0.0000')}</div>
+          <div className="text-sm text-[#e0e0e0]">{numeral(position.shares).format('0,0.00')}</div>
         </div>
         <div className="text-right w-20">
           <div className="text-xs text-gray-500">成本价</div>
-          <div className="text-sm text-[#e0e0e0]">{numeral(position.avg_cost).format('0.000000')}</div>
+          <div className="text-sm text-[#e0e0e0]">{numeral(position.avg_cost).format('0.0000')}</div>
         </div>
         <div className="text-right w-24">
           <div className="text-xs text-gray-500">当前净值</div>
