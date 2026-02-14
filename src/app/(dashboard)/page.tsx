@@ -5,62 +5,90 @@ import Link from 'next/link';
 import axios from 'axios';
 import { Combobox } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon, TrashIcon, ChartBarIcon } from '@heroicons/react/20/solid';
-import { FundRealtimeValuation, FundDetail } from '@/types';
+import { FundRealtimeValuation, FundDetail, UserFundWithValue } from '@/types';
 import numeral from 'numeral';
 import { useTranslations } from 'next-intl';
 import FundComparison from '@/components/FundComparison';
 import { DndContext, closestCenter, DragEndEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableItem } from '@/components/SortableItem';
+import AddFundModal from '@/components/AddFundModal';
 
-const STORAGE_KEY = 'my_funds';
 type SearchFund = { code: string; name: string; type?: string };
 
 export default function Home() {
   const t = useTranslations('Home');
-  const [myFunds, setMyFunds] = useState<string[]>([]);
-  const [fundData, setFundData] = useState<FundRealtimeValuation[]>([]);
+  const [userFunds, setUserFunds] = useState<UserFundWithValue[]>([]);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [pendingFund, setPendingFund] = useState<SearchFund | null>(null);
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchFund[]>([]);
   const [loading, setLoading] = useState(false);
-  
+
   // Comparison state
   const [isComparing, setIsComparing] = useState(false);
   const [comparisonFunds, setComparisonFunds] = useState<FundDetail[]>([]);
   const [isComparingLoading, setIsComparingLoading] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setMyFunds(JSON.parse(saved));
-    } else {
-      const defaults = ['320007', '005827'];
-      setMyFunds(defaults);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
-    }
+    const fetchUserFunds = async () => {
+      try {
+        const res = await axios.get('/api/user-funds');
+        setUserFunds(res.data || []);
+      } catch (e) {
+        console.error('Failed to fetch user funds', e);
+      }
+    };
+    fetchUserFunds();
   }, []);
 
   useEffect(() => {
-    if (myFunds.length === 0) {
-      setFundData([]);
+    if (userFunds.length === 0) {
       return;
     }
 
     const fetchData = async () => {
       setLoading(true);
-      const promises = myFunds.map(code =>
-        axios.get(`/api/funds/realtime?code=${code}`).then(res => res.data).catch(() => null)
+      const promises = userFunds.map(fund =>
+        axios.get(`/api/funds/realtime?code=${fund.fund_code}`).then(res => res.data).catch(() => null)
       );
 
       const results = await Promise.all(promises);
-      setFundData(results.filter(r => r !== null));
+      const realtimeData = results.filter(r => r !== null) as FundRealtimeValuation[];
+
+      // Merge realtime data with user fund data
+      const mergedData = userFunds.map(userFund => {
+        const realtime = realtimeData.find(r => r.fundCode === userFund.fund_code);
+        if (!realtime) return null;
+
+        const nav = realtime.nav || 0;
+        const estimatedNav = realtime.estimatedNav || 0;
+        const currentValue = userFund.shares * estimatedNav;
+        const totalCost = userFund.shares * userFund.cost;
+        const profit = currentValue - totalCost;
+        const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
+
+        return {
+          ...userFund,
+          nav,
+          estimatedNav,
+          estimatedChange: realtime.estimatedChange,
+          estimatedChangePercent: realtime.estimatedChangePercent,
+          currentValue,
+          totalCost,
+          profit,
+          profitPercent,
+        };
+      }).filter(Boolean) as UserFundWithValue[];
+
+      setUserFunds(mergedData);
       setLoading(false);
     };
 
     fetchData();
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, [myFunds]);
+  }, [userFunds.length]);
 
   useEffect(() => {
     if (query.length < 2) {
@@ -81,34 +109,48 @@ export default function Home() {
   }, [query]);
 
   const addFund = (fund: SearchFund | null) => {
-    if (fund && !myFunds.includes(fund.code)) {
-      const newFunds = [...myFunds, fund.code];
-      setMyFunds(newFunds);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newFunds));
+    if (fund) {
+      setPendingFund(fund);
+      setAddModalOpen(true);
     }
     setQuery('');
     setSearchResults([]);
   };
 
-  const removeFund = (code: string) => {
-    const newFunds = myFunds.filter(c => c !== code);
-    setMyFunds(newFunds);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newFunds));
+  const handleAddFundConfirm = async (shares: number, cost: number) => {
+    if (!pendingFund) return;
+    try {
+      await axios.post('/api/user-funds', {
+        fund_code: pendingFund.code,
+        fund_name: pendingFund.name,
+        shares,
+        cost
+      });
+      const res = await axios.get('/api/user-funds');
+      setUserFunds(res.data || []);
+    } catch (e) {
+      console.error('Failed to add fund', e);
+    }
+    setAddModalOpen(false);
+    setPendingFund(null);
   };
 
-  const handleClearAll = () => {
-    setMyFunds([]);
-    setFundData([]);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  const removeFund = async (id: string) => {
+    try {
+      await axios.delete(`/api/user-funds/${id}`);
+      setUserFunds(userFunds.filter(f => f.id !== id));
+    } catch (e) {
+      console.error('Failed to remove fund', e);
+    }
   };
 
   const handleCompare = async () => {
-    if (myFunds.length === 0) return;
-    
+    if (userFunds.length === 0) return;
+
     setIsComparingLoading(true);
     try {
-      const promises = myFunds.map(code => 
-        axios.get(`/api/funds/${code}/holdings`).then(res => res.data)
+      const promises = userFunds.map(fund =>
+        axios.get(`/api/funds/${fund.fund_code}/holdings`).then(res => res.data)
       );
       const results = await Promise.all(promises);
       setComparisonFunds(results);
@@ -132,28 +174,20 @@ export default function Home() {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      setFundData((items) => {
-        const oldIndex = items.findIndex((item) => item.fundCode === active.id);
-        const newIndex = items.findIndex((item) => item.fundCode === over.id);
+      setUserFunds((items) => {
+        const oldIndex = items.findIndex((item) => item.fund_code === active.id);
+        const newIndex = items.findIndex((item) => item.fund_code === over.id);
         return arrayMove(items, oldIndex, newIndex);
-      });
-
-      setMyFunds((currentIds) => {
-        const oldIndex = currentIds.indexOf(String(active.id));
-        const newIndex = currentIds.indexOf(String(over.id));
-        const newIds = arrayMove(currentIds, oldIndex, newIndex);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newIds));
-        return newIds;
       });
     }
   };
 
   return (
     <div className="space-y-6">
-      <FundComparison 
-        isOpen={isComparing} 
-        onClose={() => setIsComparing(false)} 
-        funds={comparisonFunds} 
+      <FundComparison
+        isOpen={isComparing}
+        onClose={() => setIsComparing(false)}
+        funds={comparisonFunds}
       />
       {/* Search Section */}
       <div className="panel-metal rounded-none p-6">
@@ -241,17 +275,10 @@ export default function Home() {
             </div>
             <h2 className="text-lg font-semibold text-[#e0e0e0]">{t('myPortfolio')}</h2>
           </div>
-          
+
           <div className="flex items-center gap-4">
-            {myFunds.length > 0 && (
+            {userFunds.length > 0 && (
               <>
-                <button
-                  onClick={handleClearAll}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a25] border border-[#ff3333] text-[#ff3333] hover:bg-[#ff3333] hover:text-[#1a1a25] transition-colors text-sm font-medium"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                  {t('clearAll')}
-                </button>
                 <button
                   onClick={handleCompare}
                   disabled={isComparingLoading}
@@ -269,7 +296,7 @@ export default function Home() {
                 </button>
               </>
             )}
-            
+
             {loading && (
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <svg className="w-4 h-4 animate-spin text-[#ff00ff]" fill="none" viewBox="0 0 24 24">
@@ -282,7 +309,7 @@ export default function Home() {
           </div>
         </div>
 
-        {myFunds.length === 0 ? (
+        {userFunds.length === 0 ? (
           <div className="p-12 text-center">
             <div className="w-16 h-16 bg-[#1a1a25] border border-[#2a2a3a] rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -299,13 +326,13 @@ export default function Home() {
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={fundData.map(f => f.fundCode)}
+                items={userFunds.map(f => f.fund_code)}
                 strategy={verticalListSortingStrategy}
               >
-                {fundData.map((fund) => (
-                  <SortableItem key={fund.fundCode} id={fund.fundCode}>
+                {userFunds.map((fund) => (
+                  <SortableItem key={fund.fund_code} id={fund.fund_code}>
                     <Link
-                      href={`/fund/${fund.fundCode}`}
+                      href={`/fund/${fund.fund_code}`}
                       className="flex items-center justify-between px-6 py-4 hover:bg-[#1a1a25] transition-colors group flex-1"
                     >
                       <div className="flex items-center gap-4">
@@ -325,35 +352,48 @@ export default function Home() {
                           </svg>
                         </div>
                         <div>
-                          <div className="font-medium text-[#e0e0e0] group-hover:text-[#00ffff] transition-colors">{fund.fundName}</div>
-                          <div className="text-sm text-gray-500">{fund.fundCode}</div>
+                          <div className="font-medium text-[#e0e0e0] group-hover:text-[#00ffff] transition-colors">{fund.fund_name}</div>
+                          <div className="text-sm text-gray-500">{fund.fund_code}</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-6">
-                        <div className="text-right">
-                          <div className="text-sm text-gray-500">{t('table.nav')}</div>
-                          <div className="font-medium text-[#e0e0e0]">{fund.nav}</div>
+                        {/* Shares */}
+                        <div className="text-right w-20">
+                          <div className="text-xs text-gray-500">持有份额</div>
+                          <div className="text-sm text-[#e0e0e0]">{numeral(fund.shares).format('0,0.0000')}</div>
                         </div>
+                        {/* Cost */}
+                        <div className="text-right w-20">
+                          <div className="text-xs text-gray-500">成本价</div>
+                          <div className="text-sm text-[#e0e0e0]">{numeral(fund.cost).format('0.000000')}</div>
+                        </div>
+                        {/* Current Value */}
                         <div className="text-right w-24">
-                          <div className="text-sm text-gray-500">{t('table.estNav')}</div>
-                          <div className={`font-semibold ${
-                            fund.estimatedChange >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
+                          <div className="text-xs text-gray-500">当前市值</div>
+                          <div className="text-sm text-[#e0e0e0]">{numeral(fund.currentValue).format('0,0.00')}</div>
+                        </div>
+                        {/* Profit */}
+                        <div className="text-right w-20">
+                          <div className="text-xs text-gray-500">累计收益</div>
+                          <div className={`text-sm font-semibold ${
+                            fund.profit >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
                           }`}>
-                            {numeral(fund.estimatedNav).format('0.0000')}
+                            {fund.profit >= 0 ? '+' : ''}{numeral(fund.profit).format('0,0.00')}
                           </div>
                         </div>
-                        <div className="text-right w-20">
-                          <div className="text-sm text-gray-500">{t('table.estChange')}</div>
-                          <div className={`font-semibold ${
-                            fund.estimatedChange >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
+                        {/* Profit Percent */}
+                        <div className="text-right w-16">
+                          <div className="text-xs text-gray-500">收益率</div>
+                          <div className={`text-sm font-semibold ${
+                            fund.profitPercent >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
                           }`}>
-                            {fund.estimatedChange >= 0 ? '+' : ''}{numeral(fund.estimatedChangePercent).format('0.00')}%
+                            {fund.profitPercent >= 0 ? '+' : ''}{numeral(fund.profitPercent).format('0.00')}%
                           </div>
                         </div>
                         <button
                           onClick={(e) => {
                             e.preventDefault();
-                            removeFund(fund.fundCode);
+                            removeFund(fund.id);
                           }}
                           className="p-2 text-gray-500 hover:text-[#ff3333] hover:bg-[#1a1a25] transition-colors"
                         >
@@ -368,6 +408,17 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      <AddFundModal
+        isOpen={addModalOpen}
+        onClose={() => {
+          setAddModalOpen(false);
+          setPendingFund(null);
+        }}
+        onSubmit={handleAddFundConfirm}
+        fundName={pendingFund?.name || ''}
+        fundCode={pendingFund?.code || ''}
+      />
     </div>
   );
 }
