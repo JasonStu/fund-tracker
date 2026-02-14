@@ -106,3 +106,25 @@ create trigger on_auth_user_created
 -- insert into public.user_profiles (id, email, role)
 -- values ('user-id-here', 'admin@example.com', 'admin')
 -- on conflict (id) do update set role = 'admin';
+
+-- 10. Create user_funds table for storing user fund holdings
+create table if not exists public.user_funds (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  fund_code varchar(20) not null,
+  fund_name text,
+  shares numeric(18, 4) not null default 0,
+  cost numeric(18, 6) not null default 0,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  unique(user_id, fund_code)
+);
+
+-- 11. Enable RLS on user_funds
+alter table public.user_funds enable row level security;
+
+-- 12. Create policies for user_funds
+-- Users can view and manage their own funds
+create policy "Users can manage own funds"
+  on public.user_funds for all
+  using (auth.uid() = user_id);
