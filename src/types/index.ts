@@ -92,3 +92,38 @@ export interface UserFundWithValue extends UserFund {
   profit: number;
   profitPercent: number;
 }
+
+export interface Position {
+  id: string;
+  user_id: string;
+  fund_code: string;
+  fund_name: string;
+  sort_order: number;
+  shares: number;
+  avg_cost: number;
+  total_buy: number;
+  total_sell: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Transaction {
+  id: string;
+  user_id: string;
+  fund_id: string;
+  fund_code: string;
+  fund_name: string;
+  transaction_type: 'buy' | 'sell';
+  shares: number;
+  price: number;
+  notes?: string;
+  created_at: string;
+}
+
+export interface TransactionData {
+  fund_id: string;
+  type: 'buy' | 'sell';
+  shares: number;
+  price: number;
+  notes?: string;
+}
