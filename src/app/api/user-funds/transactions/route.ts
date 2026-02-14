@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     // Verify fund exists and belongs to user
     const { data: fund, error: fundError } = await supabase
       .from('user_funds')
-      .select('id, fund_code, fund_name, shares')
+      .select('id, fund_code, fund_name')
       .eq('id', fund_id)
       .eq('user_id', userId)
       .single();
@@ -78,15 +78,33 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate sell operation has sufficient shares
-    if (type === 'sell') {
-      const currentShares = Number(fund.shares) || 0;
-      if (shares > currentShares) {
-        return NextResponse.json(
-          { error: 'Insufficient shares for sell operation' },
-          { status: 400 }
-        );
+    // Calculate current shares from transactions
+    const { data: transactions, error: txError } = await supabase
+      .from('fund_transactions')
+      .select('shares, transaction_type')
+      .eq('fund_id', fund_id)
+      .eq('user_id', userId);
+
+    if (txError) {
+      console.error('Fetch transactions error:', txError);
+      return NextResponse.json({ error: 'Failed to calculate shares' }, { status: 500 });
+    }
+
+    let currentShares = 0;
+    for (const tx of transactions || []) {
+      if (tx.transaction_type === 'buy') {
+        currentShares += Number(tx.shares) || 0;
+      } else if (tx.transaction_type === 'sell') {
+        currentShares -= Number(tx.shares) || 0;
       }
+    }
+
+    // Validate sell operation has sufficient shares
+    if (type === 'sell' && shares > currentShares) {
+      return NextResponse.json(
+        { error: 'Insufficient shares for sell operation' },
+        { status: 400 }
+      );
     }
 
     // Create transaction record
