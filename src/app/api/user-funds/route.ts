@@ -202,6 +202,36 @@ export async function GET() {
       const remainingCost = buyLots.reduce((sum, lot) => sum + lot.cost, 0);
       const avgCost = currentShares > 0 ? remainingCost / currentShares : 0;
 
+      // Calculate realized profit from all sells (FIFO cost basis)
+      let realizedCost = 0;
+      const tempLots: BuyLot[] = [];
+      for (const tx of fundTransactions) {
+        const txShares = Number(tx.shares) || 0;
+        const txPrice = Number(tx.price) || 0;
+        if (tx.transaction_type === 'buy') {
+          tempLots.push({ shares: txShares, cost: txShares * txPrice, pricePerShare: txPrice });
+        } else if (tx.transaction_type === 'sell') {
+          let sharesToCalc = txShares;
+          while (sharesToCalc > 0 && tempLots.length > 0) {
+            const lot = tempLots[0];
+            const consumed = Math.min(lot.shares, sharesToCalc);
+            realizedCost += consumed * lot.pricePerShare;
+            sharesToCalc -= consumed;
+            if (lot.shares <= consumed) {
+              tempLots.shift();
+            } else {
+              lot.shares -= consumed;
+              lot.cost = lot.shares * lot.pricePerShare;
+            }
+          }
+        }
+      }
+
+      // Total profit = realized profit + unrealized profit
+      const realizedProfit = totalSell - realizedCost;
+      const unrealizedProfit = (currentShares * valuation.estimatedNav) - remainingCost;
+      const totalProfit = realizedProfit + unrealizedProfit;
+
       console.log(`[DEBUG] Fund ${position.fund_code} FIFO result:`, {
         shares: currentShares,
         avgCost,
@@ -212,11 +242,13 @@ export async function GET() {
           shares: lot.shares,
           cost: lot.cost,
           pricePerShare: lot.pricePerShare
-        }))
+        })),
+        realizedProfit,
+        unrealizedProfit,
+        totalProfit
       });
 
       const currentValue = currentShares * valuation.estimatedNav;
-      const profit = currentValue - remainingCost;
 
       return {
         ...position,
@@ -229,8 +261,8 @@ export async function GET() {
         total_buy: totalBuy,
         total_sell: totalSell,
         currentValue,
-        profit,
-        profitPercent: remainingCost > 0 ? (profit / remainingCost) * 100 : 0,
+        profit: totalProfit,
+        profitPercent: totalBuy > 0 ? (totalProfit / totalBuy) * 100 : 0,
       };
     });
 
