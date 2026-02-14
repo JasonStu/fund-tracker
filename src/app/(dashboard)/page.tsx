@@ -84,20 +84,11 @@ export default function Home() {
         cost: cost || 0
       });
       await fetchPositions();
-    } catch (e: any) {
-      console.error('Failed to add fund', e?.response?.data || e.message);
+    } catch (e: unknown) {
+      console.error('Failed to add fund', e instanceof Error ? e.message : 'Unknown error');
     }
     setAddModalOpen(false);
     setPendingFund(null);
-  };
-
-  const removeFund = async (id: string) => {
-    try {
-      await axios.delete(`/api/user-funds/${id}`);
-      setPositions(prev => prev.filter(f => f.id !== id));
-    } catch (e) {
-      console.error('Failed to remove fund', e);
-    }
   };
 
   const handleAddPosition = (fundCode: string, fundName: string) => {
