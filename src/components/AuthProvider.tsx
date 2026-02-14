@@ -41,42 +41,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   console.log('[Auth] Initial state:', { user: !!user, isLoading, pathname });
 
+  const fetchUserProfile = async (sessionUser: { id: string; email?: string }) => {
+    try {
+      // Add timeout for profile fetch
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+      );
+      
+      const profilePromise = supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', sessionUser.id)
+        .single();
+
+      const result = await Promise.race([profilePromise, timeoutPromise]) as { data: User | null; error: Error | null } | undefined;
+      const userData = result?.data;
+      const error = result?.error;
+
+      console.log('[Auth] User profile fetch result:', { error, hasData: !!userData, errorMessage: error?.message });
+
+      if (userData) {
+        setUser(userData);
+        console.log('[Auth] User profile updated:', userData.email);
+      }
+    } catch (err) {
+      console.error('[Auth] Error fetching profile:', err);
+    }
+  };
+
   const refreshUser = useCallback(async () => {
     console.log('[Auth] refreshUser called');
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // Add timeout to prevent hanging indefinitely
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Session fetch timeout')), 5000)
+      );
+
+      const sessionPromise = supabase.auth.getSession();
+      
+      const result = await Promise.race([sessionPromise, timeoutPromise]) as { data: { session: { user: { id: string; email?: string } } | null } | null };
+      const session = result?.data?.session;
+
       console.log('[Auth] getSession result:', { hasSession: !!session?.user });
 
       if (session?.user) {
-        console.log('[Auth] Session exists, fetching user profile:', session.user.id);
-        const { data: userData, error } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-
-        console.log('[Auth] User profile fetch result:', { error, hasData: !!userData, errorMessage: error?.message });
-
-        if (userData) {
-          setUser(userData as User);
-          console.log('[Auth] User set:', userData.email);
-        } else {
-          // 如果没有 user_profiles 记录，设置一个临时 user
-          console.log('[Auth] No user profile found, setting fallback user');
-          setUser({
-            id: session.user.id,
-            email: session.user.email || 'unknown',
-            role: 'user',
-            created_at: new Date().toISOString()
-          } as User);
-        }
+        // Set basic user immediately
+        setUser({
+          id: session.user.id,
+          email: session.user.email || 'unknown',
+          role: 'user',
+          created_at: new Date().toISOString()
+        } as User);
+        
+        // Fetch profile in background
+        fetchUserProfile(session.user);
       } else {
         console.log('[Auth] No session, user is null');
         setUser(null);
       }
     } catch (error) {
       console.error('[Auth] Error refreshing user:', error);
-      setUser(null);
     } finally {
       console.log('[Auth] refreshUser completed, setting isLoading=false');
       setIsLoading(false);
@@ -97,28 +121,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         setHasCheckedAuth(true);
       } else if (session?.user) {
-        const { data: userData, error } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-
-        console.log('[Auth] onAuthStateChange profile fetch:', { error, hasData: !!userData });
-
-        if (userData) {
-          setUser(userData as User);
-          console.log('[Auth] onAuthStateChange set user:', userData.email);
-        } else {
-          console.log('[Auth] onAuthStateChange no profile, setting fallback');
-          setUser({
+        // Set basic user immediately
+        setUser(prev => {
+          // If we already have a user and it matches the session, don't reset to basic unless needed
+          if (prev && prev.id === session.user.id) return prev;
+          return {
             id: session.user.id,
             email: session.user.email || 'unknown',
             role: 'user',
             created_at: new Date().toISOString()
-          } as User);
-        }
+          } as User;
+        });
+        
         setIsLoading(false);
         setHasCheckedAuth(true);
+        
+        // Fetch profile in background
+        fetchUserProfile(session.user);
       } else {
         // No session on initial load
         setIsLoading(false);
@@ -151,6 +170,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       router.replace('/login?redirect=' + encodeURIComponent(pathname));
     } else if (user) {
       console.log('[Auth] User authenticated, allowing access');
+      // If user is authenticated and on a public route (like /login), redirect to home
+      if (isPublicRoute) {
+        console.log('[Auth] User authenticated on public route - REDIRECTING to /');
+        router.replace('/');
+      }
     }
   }, [user, isLoading, hasCheckedAuth, pathname, router]);
 

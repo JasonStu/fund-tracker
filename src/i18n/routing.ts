@@ -6,7 +6,10 @@ export const routing = defineRouting({
   locales: ['en', 'zh'],
 
   // Used when no locale matches
-  defaultLocale: 'zh'
+  defaultLocale: 'zh',
+  
+  // Disable locale prefix in URL
+  localePrefix: 'never'
 });
 
 // Cookie name for locale storage
