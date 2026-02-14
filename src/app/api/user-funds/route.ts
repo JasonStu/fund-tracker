@@ -142,8 +142,9 @@ export async function GET() {
       const valuation = valuations[index];
 
       // Get all transactions for this fund, sorted by date (FIFO)
+      // Use fund_code to match since fund_transactions table doesn't have fund_id
       const fundTransactions = (transactions || [])
-        .filter(tx => tx.fund_id === position.id)
+        .filter(tx => tx.fund_code === position.fund_code)
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
       // FIFO calculation: track buy lots

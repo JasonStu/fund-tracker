@@ -78,11 +78,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Calculate current shares from transactions
+    // Calculate current shares from transactions using fund_code
     const { data: transactions, error: txError } = await supabase
       .from('fund_transactions')
       .select('shares, transaction_type')
-      .eq('fund_id', fund_id)
+      .eq('fund_code', fund.fund_code)
       .eq('user_id', userId);
 
     if (txError) {
@@ -112,7 +112,6 @@ export async function POST(request: Request) {
       .from('fund_transactions')
       .insert({
         user_id: userId,
-        fund_id,
         fund_code: fund.fund_code,
         fund_name: fund.fund_name,
         transaction_type: type,
