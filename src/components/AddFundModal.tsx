@@ -24,9 +24,14 @@ export default function AddFundModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const sharesValue = parseFloat(shares);
+    const costValue = parseFloat(cost);
+    if (isNaN(sharesValue) || isNaN(costValue)) {
+      return; // Don't submit invalid values
+    }
     onSubmit({
-      shares: parseFloat(shares),
-      cost: parseFloat(cost),
+      shares: sharesValue,
+      cost: costValue,
     });
     setShares('');
     setCost('');
@@ -51,6 +56,7 @@ export default function AddFundModal({
             <button
               onClick={handleClose}
               className="text-gray-400 hover:text-white transition-colors"
+              aria-label="关闭"
             >
               <XMarkIcon className="w-5 h-5" />
             </button>
@@ -73,7 +79,7 @@ export default function AddFundModal({
                 type="number"
                 id="shares"
                 step="0.0001"
-                precision={4}
+                min="0"
                 value={shares}
                 onChange={(e) => setShares(e.target.value)}
                 placeholder="请输入份额"
@@ -90,7 +96,7 @@ export default function AddFundModal({
                 type="number"
                 id="cost"
                 step="0.000001"
-                precision={6}
+                min="0"
                 value={cost}
                 onChange={(e) => setCost(e.target.value)}
                 placeholder="请输入成本"
