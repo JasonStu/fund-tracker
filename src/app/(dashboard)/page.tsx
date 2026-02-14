@@ -32,11 +32,14 @@ export default function Home() {
 
   // Fetch positions from API
   const fetchPositions = async () => {
+    setLoading(true);
     try {
       const res = await axios.get('/api/user-funds');
       setPositions(res.data.positions || []);
     } catch (e) {
       console.error('Failed to fetch positions', e);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,7 +55,7 @@ export default function Home() {
 
     const timeoutId = setTimeout(async () => {
       try {
-        const res = await axios.get(`/api/funds/search?q=${query}`);
+        const res = await axios.get(`/api/funds/search?q=${encodeURIComponent(query)}`);
         setSearchResults(res.data.funds || []);
       } catch (e) {
         console.error(e);
@@ -75,10 +78,10 @@ export default function Home() {
     if (!pendingFund) return;
     try {
       await axios.post('/api/user-funds', {
-        fund_code: String(pendingFund.code || ''),
-        fund_name: String(pendingFund.name || ''),
-        shares: Number(shares) || 0,
-        cost: Number(cost) || 0
+        fund_code: pendingFund.code || '',
+        fund_name: pendingFund.name || '',
+        shares: shares || 0,
+        cost: cost || 0
       });
       await fetchPositions();
     } catch (e: any) {
