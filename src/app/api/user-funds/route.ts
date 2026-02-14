@@ -97,6 +97,13 @@ export async function GET() {
         avg_cost: 0,
         total_buy: 0,
         total_sell: 0,
+        nav: 0,
+        estimatedNav: 0,
+        estimatedChange: 0,
+        estimatedChangePercent: 0,
+        currentValue: 0,
+        profit: 0,
+        profitPercent: 0,
         created_at: fund.created_at,
         updated_at: fund.updated_at,
       });
