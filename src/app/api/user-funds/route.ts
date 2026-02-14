@@ -114,69 +114,76 @@ export async function GET() {
   }
 }
 
+interface AddFundBody {
+  fund_code: string;
+  fund_name?: string;
+  shares?: number;
+  cost?: number;
+}
+
 export async function POST(request: Request) {
+  const supabase = await createServerSupabaseClient();
+
+  // Check authentication
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const userId = user.id;
+
+  let body: AddFundBody;
   try {
-    // Create Supabase client with auth context
-    const supabase = await createServerSupabaseClient();
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
 
-    // Check authentication
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession();
+  const { fund_code, fund_name, shares = 0, cost = 0 } = body;
 
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  if (!fund_code || typeof fund_code !== 'string' || fund_code.trim() === '') {
+    return NextResponse.json({ error: 'fund_code is required and must be a non-empty string' }, { status: 400 });
+  }
 
-    const userId = session.user.id;
+  if (typeof shares !== 'number' || shares < 0) {
+    return NextResponse.json({ error: 'shares must be a non-negative number' }, { status: 400 });
+  }
 
-    // Parse request body
-    const body = await request.json();
-    const { fund_code, fund_name, shares = 0, cost = 0 } = body;
+  if (typeof cost !== 'number' || cost < 0) {
+    return NextResponse.json({ error: 'cost must be a non-negative number' }, { status: 400 });
+  }
 
-    // Validate required fields
-    if (!fund_code) {
+  // Insert into user_funds table
+  const { data: newFund, error: insertError } = await supabase
+    .from('user_funds')
+    .insert({
+      user_id: userId,
+      fund_code: fund_code.trim(),
+      fund_name: fund_name || null,
+      shares,
+      cost,
+    })
+    .select()
+    .single();
+
+  if (insertError) {
+    // Check for unique violation (fund already exists)
+    if (insertError.code === '23505') {
       return NextResponse.json(
-        { error: 'fund_code is required' },
-        { status: 400 }
+        { error: 'Fund already exists in your portfolio' },
+        { status: 409 }
       );
     }
-
-    // Insert into user_funds table
-    const { data: newFund, error: insertError } = await supabase
-      .from('user_funds')
-      .insert({
-        user_id: userId,
-        fund_code,
-        fund_name: fund_name || null,
-        shares,
-        cost,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      // Check for unique violation (fund already exists)
-      if (insertError.code === '23505') {
-        return NextResponse.json(
-          { error: 'Fund already exists in your portfolio' },
-          { status: 409 }
-        );
-      }
-      console.error('Insert user fund error:', insertError);
-      return NextResponse.json(
-        { error: 'Failed to add fund' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(newFund, { status: 201 });
-  } catch (error) {
-    console.error('POST /api/user-funds error:', error);
+    console.error('Insert user fund error:', insertError);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to add fund' },
       { status: 500 }
     );
   }
+
+  return NextResponse.json(newFund, { status: 201 });
 }
