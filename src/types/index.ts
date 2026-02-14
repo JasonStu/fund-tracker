@@ -70,3 +70,21 @@ export interface FundRealtimeValuation {
   estimatedChangePercent: number;
   calculationTime: string;
 }
+
+export interface UserFund {
+  id: string;
+  userId: string;
+  fundCode: string;
+  shares: number;
+  cost: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserFundWithValue extends UserFund {
+  fundName: string;
+  currentNav: number;
+  currentValue: number;
+  profit: number;
+  profitPercent: number;
+}
