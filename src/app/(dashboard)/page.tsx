@@ -86,9 +86,9 @@ export default function Home() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [userFunds.length]);
+    const intervalId = setInterval(fetchData, 30000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     if (query.length < 2) {
@@ -138,7 +138,7 @@ export default function Home() {
   const removeFund = async (id: string) => {
     try {
       await axios.delete(`/api/user-funds/${id}`);
-      setUserFunds(userFunds.filter(f => f.id !== id));
+      setUserFunds(prev => prev.filter(f => f.id !== id));
     } catch (e) {
       console.error('Failed to remove fund', e);
     }
