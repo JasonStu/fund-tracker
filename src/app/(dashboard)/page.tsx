@@ -117,19 +117,20 @@ export default function Home() {
     setSearchResults([]);
   };
 
-  const handleAddFundConfirm = async (shares: number, cost: number) => {
+  const handleAddFundConfirm = async ({ shares, cost }: { shares: number; cost: number }) => {
     if (!pendingFund) return;
+    console.log('Adding fund:', { code: pendingFund.code, name: pendingFund.name, shares, cost });
     try {
       await axios.post('/api/user-funds', {
-        fund_code: pendingFund.code,
-        fund_name: pendingFund.name,
-        shares,
-        cost
+        fund_code: String(pendingFund.code || ''),
+        fund_name: String(pendingFund.name || ''),
+        shares: Number(shares) || 0,
+        cost: Number(cost) || 0
       });
       const res = await axios.get('/api/user-funds');
       setUserFunds(res.data || []);
-    } catch (e) {
-      console.error('Failed to add fund', e);
+    } catch (e: any) {
+      console.error('Failed to add fund', e?.response?.data || e.message);
     }
     setAddModalOpen(false);
     setPendingFund(null);

@@ -143,21 +143,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { fund_code, fund_name, shares = 0, cost = 0 } = body;
+  const { fund_code, fund_name, shares: sharesInput = 0, cost: costInput = 0 } = body;
+
+  // Log raw body for debugging
+  console.log('Raw body:', body);
+
+  // Convert to numbers and validate
+  const shares = Number(sharesInput);
+  const cost = Number(costInput);
+
+  console.log('Parsed values:', { fund_code, fund_name, shares, cost });
 
   if (!fund_code || typeof fund_code !== 'string' || fund_code.trim() === '') {
     return NextResponse.json({ error: 'fund_code is required and must be a non-empty string' }, { status: 400 });
   }
 
-  if (typeof shares !== 'number' || shares < 0) {
+  if (isNaN(shares) || shares < 0) {
     return NextResponse.json({ error: 'shares must be a non-negative number' }, { status: 400 });
   }
 
-  if (typeof cost !== 'number' || cost < 0) {
+  if (isNaN(cost) || cost < 0) {
     return NextResponse.json({ error: 'cost must be a non-negative number' }, { status: 400 });
   }
 
   // Insert into user_funds table
+  console.log('Inserting fund:', { fund_code, fund_name, shares, cost });
   const { data: newFund, error: insertError } = await supabase
     .from('user_funds')
     .insert({
@@ -171,6 +181,7 @@ export async function POST(request: Request) {
     .single();
 
   if (insertError) {
+    console.error('Insert user fund error:', insertError);
     // Check for unique violation (fund already exists)
     if (insertError.code === '23505') {
       return NextResponse.json(
@@ -178,7 +189,10 @@ export async function POST(request: Request) {
         { status: 409 }
       );
     }
-    console.error('Insert user fund error:', insertError);
+    return NextResponse.json(
+      { error: insertError.message },
+      { status: 500 }
+    );
     return NextResponse.json(
       { error: 'Failed to add fund' },
       { status: 500 }

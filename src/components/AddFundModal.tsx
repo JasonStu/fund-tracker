@@ -24,11 +24,9 @@ export default function AddFundModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const sharesValue = parseFloat(shares);
-    const costValue = parseFloat(cost);
-    if (isNaN(sharesValue) || isNaN(costValue)) {
-      return; // Don't submit invalid values
-    }
+    // Allow empty strings, default to 0
+    const sharesValue = shares === '' ? 0 : parseFloat(shares);
+    const costValue = cost === '' ? 0 : parseFloat(cost);
     onSubmit({
       shares: sharesValue,
       cost: costValue,
