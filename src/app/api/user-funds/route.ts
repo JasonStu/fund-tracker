@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { UserFundWithValue } from '@/types';
+import { Position, Transaction } from '@/types';
 import axios from 'axios';
 import { NextResponse } from 'next/server';
 
@@ -52,12 +52,12 @@ export async function GET() {
 
     const userId = session.user.id;
 
-    // Fetch user's funds from user_funds table
+    // Fetch user's funds from user_funds table with sort_order
     const { data: userFunds, error: fundsError } = await supabase
       .from('user_funds')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .order('sort_order', { ascending: true });
 
     if (fundsError) {
       console.error('Fetch user funds error:', fundsError);
@@ -67,44 +67,103 @@ export async function GET() {
       );
     }
 
-    // Fetch realtime valuations for each fund in parallel
-    const valuationPromises = userFunds.map((fund) =>
-      getFundRealtimeValuation(fund.fund_code)
+    // Fetch all transactions for this user
+    const { data: transactions, error: transactionsError } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+
+    if (transactionsError) {
+      console.error('Fetch transactions error:', transactionsError);
+      return NextResponse.json(
+        { error: 'Failed to fetch transactions' },
+        { status: 500 }
+      );
+    }
+
+    // Aggregate position data by fund_id
+    const positionMap = new Map<string, Position>();
+
+    // Initialize positions from user_funds
+    for (const fund of userFunds) {
+      positionMap.set(fund.id, {
+        id: fund.id,
+        user_id: fund.user_id,
+        fund_code: fund.fund_code,
+        fund_name: fund.fund_name || `Fund ${fund.fund_code}`,
+        sort_order: fund.sort_order || 0,
+        shares: 0,
+        avg_cost: 0,
+        total_buy: 0,
+        total_sell: 0,
+        created_at: fund.created_at,
+        updated_at: fund.updated_at,
+      });
+    }
+
+    // Aggregate transactions
+    for (const tx of transactions || []) {
+      const position = positionMap.get(tx.fund_id);
+      if (!position) continue;
+
+      const txShares = Number(tx.shares) || 0;
+      const txPrice = Number(tx.price) || 0;
+
+      if (tx.type === 'buy') {
+        // Calculate new average cost
+        const currentShares = position.shares;
+        const newShares = currentShares + txShares;
+        const totalBuyCost = position.total_buy + (txShares * txPrice);
+
+        if (newShares > 0) {
+          position.avg_cost = totalBuyCost / newShares;
+        }
+        position.shares = newShares;
+        position.total_buy = totalBuyCost;
+      } else if (tx.type === 'sell') {
+        position.shares = Math.max(0, position.shares - txShares);
+        position.total_sell += txShares * txPrice;
+      }
+    }
+
+    // Convert to array and sort by sort_order
+    const positions: Position[] = Array.from(positionMap.values())
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    // Fetch realtime valuations for each position in parallel
+    const valuationPromises = positions.map((position) =>
+      getFundRealtimeValuation(position.fund_code)
     );
     const valuations = await Promise.all(valuationPromises);
 
-    // Merge user funds with realtime valuations
-    const userFundsWithValue: UserFundWithValue[] = userFunds.map(
-      (fund, index) => {
-        const valuation = valuations[index];
-        const totalCost = Number(fund.shares) * Number(fund.cost);
-        const currentValue = Number(fund.shares) * valuation.estimatedNav;
-        const profit = currentValue - totalCost;
-        const profitPercent =
-          totalCost > 0 ? (profit / totalCost) * 100 : 0;
+    // Add valuation data to positions
+    const positionsWithValue = positions.map((position, index) => {
+      const valuation = valuations[index];
+      const currentValue = position.shares * valuation.estimatedNav;
+      const totalCost = position.total_buy - position.total_sell;
+      const profit = currentValue - totalCost;
+      const costBasis = position.total_buy - position.total_sell;
+      const profitPercent = costBasis > 0 ? (profit / costBasis) * 100 : 0;
 
-        return {
-          id: fund.id,
-          user_id: fund.user_id,
-          fund_code: fund.fund_code,
-          fund_name: fund.fund_name || `Fund ${fund.fund_code}`,
-          shares: Number(fund.shares),
-          cost: Number(fund.cost),
-          created_at: fund.created_at,
-          updated_at: fund.updated_at,
-          nav: valuation.nav,
-          estimatedNav: valuation.estimatedNav,
-          estimatedChange: valuation.estimatedChange,
-          estimatedChangePercent: valuation.estimatedChangePercent,
-          currentValue,
-          totalCost,
-          profit,
-          profitPercent,
-        };
-      }
-    );
+      return {
+        ...position,
+        nav: valuation.nav,
+        estimatedNav: valuation.estimatedNav,
+        estimatedChange: valuation.estimatedChange,
+        estimatedChangePercent: valuation.estimatedChangePercent,
+        currentValue,
+        totalCost,
+        profit,
+        profitPercent,
+      };
+    });
 
-    return NextResponse.json(userFundsWithValue);
+    // Return both positions and transactions
+    return NextResponse.json({
+      positions: positionsWithValue,
+      transactions: transactions || [],
+    });
   } catch (error) {
     console.error('GET /api/user-funds error:', error);
     return NextResponse.json(
@@ -166,37 +225,87 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'cost must be a non-negative number' }, { status: 400 });
   }
 
+  // Check if fund already exists for this user
+  const { data: existingFund, error: checkError } = await supabase
+    .from('user_funds')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('fund_code', fund_code.trim())
+    .single();
+
+  if (existingFund) {
+    return NextResponse.json(
+      { error: 'Fund already exists in your portfolio' },
+      { status: 409 }
+    );
+  }
+
+  // Get max sort_order for this user
+  const { data: maxOrderData, error: orderError } = await supabase
+    .from('user_funds')
+    .select('sort_order')
+    .eq('user_id', userId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .single();
+
+  const newSortOrder = maxOrderData ? (Number(maxOrderData.sort_order) || 0) + 1 : 0;
+
+  if (orderError && orderError.code !== 'PGRST116') {
+    console.error('Get max sort_order error:', orderError);
+    return NextResponse.json(
+      { error: 'Failed to determine sort order' },
+      { status: 500 }
+    );
+  }
+
   // Insert into user_funds table
-  console.log('Inserting fund:', { fund_code, fund_name, shares, cost });
+  console.log('Inserting fund:', { fund_code, fund_name, shares, cost, sort_order: newSortOrder });
   const { data: newFund, error: insertError } = await supabase
     .from('user_funds')
     .insert({
       user_id: userId,
       fund_code: fund_code.trim(),
       fund_name: fund_name || null,
-      shares,
-      cost,
+      shares: 0, // Always start with 0, we'll create a transaction for initial shares
+      cost: 0,
+      sort_order: newSortOrder,
     })
     .select()
     .single();
 
   if (insertError) {
     console.error('Insert user fund error:', insertError);
-    // Check for unique violation (fund already exists)
-    if (insertError.code === '23505') {
-      return NextResponse.json(
-        { error: 'Fund already exists in your portfolio' },
-        { status: 409 }
-      );
-    }
     return NextResponse.json(
       { error: insertError.message },
       { status: 500 }
     );
-    return NextResponse.json(
-      { error: 'Failed to add fund' },
-      { status: 500 }
-    );
+  }
+
+  // If shares > 0, create initial buy transaction
+  if (shares > 0) {
+    const { error: txError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: userId,
+        fund_id: newFund.id,
+        fund_code: fund_code.trim(),
+        fund_name: fund_name || null,
+        type: 'buy',
+        shares,
+        price: cost,
+        total_amount: shares * cost,
+        notes: 'Initial position',
+      });
+
+    if (txError) {
+      console.error('Create initial transaction error:', txError);
+      // Fund was created, but transaction failed - still return success with warning
+      return NextResponse.json(
+        { ...newFund, warning: 'Fund created but initial transaction failed' },
+        { status: 201 }
+      );
+    }
   }
 
   return NextResponse.json(newFund, { status: 201 });
