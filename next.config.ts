@@ -8,30 +8,6 @@ const withNextIntl = createNextIntlPlugin(
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
-  async redirects() {
-    return [
-      {
-        source: '/zh/:path*',
-        destination: '/:path*',
-        permanent: true,
-      },
-      {
-        source: '/en/:path*',
-        destination: '/:path*',
-        permanent: true,
-      },
-      {
-        source: '/zh',
-        destination: '/',
-        permanent: true,
-      },
-      {
-        source: '/en',
-        destination: '/',
-        permanent: true,
-      },
-    ];
-  },
 };
 
 export default withNextIntl(nextConfig);

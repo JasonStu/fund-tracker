@@ -245,146 +245,56 @@ Access the editor at `/editor` or `/zh/editor`:
 
 ---
 
-## 多语言与认证重定向优化 (2025-02-13)
+## 问题与修复日志 (2025-02-13)
 
-### 问题描述
+### 1. 多语言与路由重构
 
-1. **登录页面闪烁** - 认证检查完成后才显示页面，导致用户体验差
-2. **URL locale 导致重定向问题** - `/en/login` 重定向到 `/login` 时丢失 locale
-3. **重定向逻辑不一致** - 未登录访问受保护页面时可能直接显示首页
+#### 问题
+- 登录页面闪烁（认证检查未完成前显示未登录态）
+- `/en/login` 等 URL 带 locale 前缀的重定向逻辑混乱
+- 路由结构不一致（`/` vs `/zh`）
 
-### 解决方案
+#### 解决方案
+- **路由扁平化**：移除 `[locale]` 目录，改为 `(dashboard)` 和 `(auth)` 组。
+- **Cookie 存储 Locale**：多语言不再依赖 URL 前缀，而是存储在 `NEXT_LOCALE` Cookie 中，默认 `zh`。
+- **中间件优化**：更新 `middleware.ts` 适配无前缀路由，防止 `/zh` 导致的 404。
+- **Next.config 清理**：移除可能导致死循环的 `redirects` 配置。
 
-#### 1. 多语言改用 Cookie 存储（默认中文 `zh`）
+### 2. 管理员权限与 RLS 无限递归
 
-**改动文件：**
-- `src/i18n/routing.ts` - 添加 `NEXT_LOCALE` cookie 常量，默认语言改为 `zh`
-- `src/i18n/request.ts` - 从 cookie 读取 locale，而非 URL 参数
+#### 问题
+- 访问 `/admin` 显示无权限，即使 `.env.local` 配置了 `ADMIN_EMAIL`。
+- API 报错：`infinite recursion detected in policy for relation "user_profiles"`。
 
-```typescript
-// src/i18n/routing.ts
-export const routing = defineRouting({
-  locales: ['en', 'zh'],
-  defaultLocale: 'zh'  // 改为中文
-});
-export const NEXT_LOCALE = 'NEXT_LOCALE';
+#### 原因分析
+- **数据库 RLS 策略死循环**：`user_profiles` 表的 "Admins can view all profiles" 策略在检查时查询了自身 (`select 1 from user_profiles...`)，导致无限递归。
+- **角色未同步**：`.env.local` 仅作为初始配置，实际权限由数据库 `user_profiles.role` 字段决定。
 
-// src/i18n/request.ts
-export default getRequestConfig(async () => {
-  const cookieStore = await cookies();
-  const incoming = cookieStore.get(NEXT_LOCALE)?.value;
-  const locale = isLocale(incoming) ? incoming : routing.defaultLocale;
-  return { locale, messages: ... };
-});
-```
+#### 解决方案
+1. **重构 RLS 策略**：
+   - 创建 `security definer` 函数 `is_admin()` 来封装管理员检查逻辑。
+   - 该函数以超级用户权限运行，绕过 RLS，打破递归。
+2. **更新 SQL**：
+   ```sql
+   create or replace function public.is_admin() returns boolean as $$
+   begin
+     return exists (select 1 from public.user_profiles where id = auth.uid() and role = 'admin');
+   end;
+   $$ language plpgsql security definer;
+   
+   -- 使用函数替代直接查询
+   create policy "Admins can view all profiles" on public.user_profiles 
+     for select using (public.is_admin());
+   ```
+3. **手动提权**：需要在 Supabase SQL Editor 执行 `update public.user_profiles set role = 'admin' where email = '...'`。
 
-#### 2. 简化路由结构 - 移除 URL 中的 `[locale]` 段
+### 3. Turbopack 缓存问题
 
-**改动：**
-- 移除 `src/app/[locale]/` 目录
-- 创建 route groups: `(auth)` 和 `(dashboard)`
+#### 问题
+- `npm run dev` 频繁崩溃或报错 `Unable to acquire lock`。
+- 修改代码后页面 404 或无变化。
 
-```
-之前:                              现在:
-src/app/[locale]/page.tsx    →    src/app/(dashboard)/page.tsx
-src/app/[locale]/editor/     →    src/app/(dashboard)/editor/
-src/app/[locale]/admin/      →    src/app/(dashboard)/admin/
-src/app/[locale]/fund/       →    src/app/(dashboard)/fund/
-src/app/[locale]/login/      →    src/app/(auth)/login/
-src/app/[locale]/register/   →    src/app/(auth)/register/
-```
-
-#### 3. 更新布局文件
-
-**改动文件：** `src/app/layout.tsx`
-- 移除 `[locale]` 参数
-- 直接包含 AuthProvider 和 Navbar
-
-```typescript
-// src/app/layout.tsx
-export default async function RootLayout({ children }) {
-  const messages = await getMessages();
-  return (
-    <html lang="zh">
-      <body>
-        <NextIntlClientProvider messages={messages}>
-          <AuthProvider>
-            <Navbar />
-            <main>{children}</main>
-          </AuthProvider>
-        </NextIntlClientProvider>
-      </body>
-    </html>
-  );
-}
-```
-
-#### 4. 优化 AuthProvider - 添加 loading 状态防止闪烁
-
-**改动文件：** `src/components/AuthProvider.tsx`
-
-```typescript
-// 添加 LoadingSpinner 组件
-function LoadingSpinner() {
-  return (
-    <div className="min-h-[60vh] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-10 h-10 border-2 border-[#00ffff] border-t-transparent rounded-full animate-spin" />
-        <span className="text-gray-400 text-sm">Loading...</span>
-      </div>
-    </div>
-  );
-}
-
-// 认证期间显示 loading
-{isLoading ? <LoadingSpinner /> : children}
-```
-
-#### 5. 修复语言切换 - 使用 Cookie
-
-**改动文件：** `src/components/Navbar.tsx`
-
-```typescript
-// 从 cookie 读取语言
-useEffect(() => {
-  const cookieLocale = document.cookie
-    .split('; ')
-    .find(row => row.startsWith(`${NEXT_LOCALE}=`))
-    ?.split('=')[1];
-  if (cookieLocale === 'en' || cookieLocale === 'zh') {
-    setLocale(cookieLocale);
-  }
-}, []);
-
-// 点击切换时写入 cookie
-const switchLocale = (newLocale: string) => {
-  document.cookie = `${NEXT_LOCALE}=${newLocale}; path=/; max-age=31536000`;
-  setLocale(newLocale);
-  router.refresh();
-};
-```
-
-### 所犯的错误及修复
-
-| 错误 | 修复 |
-|------|------|
-| `import "../globals.css"` 路径错误 | 改为 `import "./globals.css"` |
-| 登录页面残留 `pathname` 变量引用导致类型错误 | 移除未使用的 `usePathname` 和 `pathname` 引用 |
-| `supabase auth signup` CLI 命令不存在 | 改用 Supabase Dashboard UI 创建用户 |
-
-### URL 变更对照
-
-| 之前 | 现在 |
-|------|------|
-| `/en/login` | `/login` |
-| `/zh/editor` | `/editor` |
-| `/en/admin` | `/admin` |
-| `/zh/fund/320007` | `/fund/320007` |
-
-### 验证测试
-
-1. ✅ 访问 `/login` → 显示登录页面（无闪烁）
-2. ✅ 未登录访问 `/` → 重定向到 `/login`
-3. ✅ 登录后 → 重定向回 `/`
-4. ✅ 切换语言 → 保存在 cookie，默认中文
-5. ✅ 登出 → 跳转 `/login`
+#### 解决方案
+- 删除 `.next` 缓存目录：`rm -rf .next`。
+- 杀死僵尸进程：`lsof -i :3000` 配合 `kill -9 <PID>`。
+- 重启开发服务器。
