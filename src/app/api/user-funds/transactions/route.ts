@@ -91,13 +91,13 @@ export async function POST(request: Request) {
 
     // Create transaction record
     const { data: transaction, error: transactionError } = await supabase
-      .from('transactions')
+      .from('fund_transactions')
       .insert({
         user_id: userId,
         fund_id,
         fund_code: fund.fund_code,
         fund_name: fund.fund_name,
-        type,
+        transaction_type,
         shares,
         price,
         total_amount: shares * price,
@@ -142,7 +142,7 @@ export async function GET() {
 
     // Fetch all transactions for user
     const { data: transactions, error: transactionsError } = await supabase
-      .from('transactions')
+      .from('fund_transactions')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });

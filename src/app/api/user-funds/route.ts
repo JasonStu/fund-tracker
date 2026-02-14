@@ -69,7 +69,7 @@ export async function GET() {
 
     // Fetch all transactions for this user
     const { data: transactions, error: transactionsError } = await supabase
-      .from('transactions')
+      .from('fund_transactions')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: true });
@@ -110,7 +110,7 @@ export async function GET() {
       const txShares = Number(tx.shares) || 0;
       const txPrice = Number(tx.price) || 0;
 
-      if (tx.type === 'buy') {
+      if (tx.transaction_type === 'buy') {
         // Calculate new average cost
         const currentShares = position.shares;
         const newShares = currentShares + txShares;
@@ -121,7 +121,7 @@ export async function GET() {
         }
         position.shares = newShares;
         position.total_buy = totalBuyCost;
-      } else if (tx.type === 'sell') {
+      } else if (tx.transaction_type === 'sell') {
         position.shares = Math.max(0, position.shares - txShares);
         position.total_sell += txShares * txPrice;
       }
@@ -288,13 +288,13 @@ export async function POST(request: Request) {
     // If shares > 0, create initial buy transaction
     if (shares > 0) {
       const { error: txError } = await supabase
-        .from('transactions')
+        .from('fund_transactions')
         .insert({
           user_id: userId,
           fund_id: newFund.id,
           fund_code: fund_code.trim(),
           fund_name: fund_name || null,
-          type: 'buy',
+          transaction_type: 'buy',
           shares,
           price: cost,
           total_amount: shares * cost,
