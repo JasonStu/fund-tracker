@@ -9,6 +9,7 @@ import numeral from 'numeral';
 import { useTranslations } from 'next-intl';
 import TransactionModal from '@/components/TransactionModal';
 import AddFundModal from '@/components/AddFundModal';
+import Link from 'next/link';
 import {
   DndContext,
   closestCenter,
@@ -106,9 +107,12 @@ function SortablePositionItem({
 
         {/* Fund Info */}
         <div className="min-w-0">
-          <div className="font-medium text-[#e0e0e0] group-hover:text-[#00ffff] transition-colors truncate">
+          <Link
+            href={`/fund/${position.fund_code}`}
+            className="font-medium text-[#e0e0e0] group-hover:text-[#00ffff] transition-colors truncate hover:underline block"
+          >
             {position.fund_name}
-          </div>
+          </Link>
           <div className="text-sm text-gray-500">{position.fund_code}</div>
         </div>
       </div>
