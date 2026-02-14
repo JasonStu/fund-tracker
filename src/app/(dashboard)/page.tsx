@@ -41,11 +41,11 @@ interface SelectedPosition {
 function SortablePositionItem({
   position,
   onAddPosition,
-  onRemove,
+  onDelete,
 }: {
   position: Position;
   onAddPosition: (fundCode: string, fundName: string) => void;
-  onRemove: (positionId: string) => void;
+  onDelete: (id: string, fundName: string) => void;
 }) {
   const {
     attributes,
@@ -162,7 +162,7 @@ function SortablePositionItem({
             </svg>
           </button>
           <button
-            onClick={() => onRemove(position.id)}
+            onClick={() => onDelete(position.id, position.fund_name)}
             className="p-2 text-gray-500 hover:text-[#ff3333] hover:bg-[#1a1a25] rounded transition-colors"
             title="删除"
           >
@@ -186,6 +186,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [txModalOpen, setTxModalOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<SelectedPosition | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   // DnD sensors
   const sensors = useSensors(
@@ -325,13 +327,23 @@ export default function Home() {
     setSelectedPosition(null);
   };
 
-  const handleRemoveFund = async (positionId: string) => {
+  // Request to delete a fund - shows confirmation dialog
+  const requestDeleteFund = (positionId: string, fundName: string) => {
+    setPendingDelete({ id: positionId, name: fundName });
+    setDeleteConfirmOpen(true);
+  };
+
+  // Confirm deletion
+  const confirmDeleteFund = async () => {
+    if (!pendingDelete) return;
     try {
-      await axios.delete(`/api/user-funds/positions/${positionId}`);
+      await axios.delete(`/api/user-funds/positions/${pendingDelete.id}`);
       await fetchPositions();
     } catch (e) {
       console.error('Failed to remove fund', e);
     }
+    setDeleteConfirmOpen(false);
+    setPendingDelete(null);
   };
 
   return (
@@ -459,7 +471,7 @@ export default function Home() {
                     key={position.id}
                     position={position}
                     onAddPosition={handleAddPosition}
-                    onRemove={handleRemoveFund}
+                    onDelete={requestDeleteFund}
                   />
                 ))}
               </div>
@@ -492,6 +504,42 @@ export default function Home() {
         }}
         currentNav={selectedPosition?.nav || 0}
       />
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#1a1a25] border border-[#2a2a3a] rounded-lg p-6 max-w-sm w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-[#ff3333]/10 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#ff3333]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-[#e0e0e0]">确认删除</h3>
+            </div>
+            <p className="text-gray-400 mb-6">
+              确定要删除基金 <span className="text-[#e0e0e0] font-medium">{pendingDelete?.name}</span> 吗？此操作不可恢复，将同时删除所有交易记录。
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setDeleteConfirmOpen(false);
+                  setPendingDelete(null);
+                }}
+                className="flex-1 px-4 py-2 bg-[#2a2a3a] text-[#e0e0e0] hover:bg-[#3a3a4a] rounded transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmDeleteFund}
+                className="flex-1 px-4 py-2 bg-[#ff3333]/20 text-[#ff3333] border border-[#ff3333] hover:bg-[#ff3333]/30 rounded transition-colors"
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
