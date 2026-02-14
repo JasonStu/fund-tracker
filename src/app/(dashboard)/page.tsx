@@ -71,22 +71,24 @@ function SortablePositionItem({
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center justify-between px-6 py-4 hover:bg-[#1a1a25] transition-colors group bg-[#0d0d15]"
+      className="flex items-stretch px-6 py-4 hover:bg-[#1a1a25] transition-colors group bg-[#0d0d15]"
     >
-      {/* Drag Handle */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing p-2 text-gray-500 hover:text-[#00ffff] transition-colors"
-        title="拖拽排序"
-      >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-        </svg>
-      </div>
+      {/* Left Section: Drag Handle + Icon + Fund Info */}
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        {/* Drag Handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1.5 text-gray-500 hover:text-[#00ffff] transition-colors shrink-0"
+          title="拖拽排序"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+          </svg>
+        </div>
 
-      <div className="flex items-center gap-4">
-        <div className={`w-10 h-10 rounded flex items-center justify-center border ${
+        {/* Icon */}
+        <div className={`w-10 h-10 rounded flex items-center justify-center border shrink-0 ${
           profit >= 0
             ? 'bg-[#1a1a25] border-[#ff3333]'
             : 'bg-[#1a1a25] border-[#33ff33]'
@@ -101,14 +103,18 @@ function SortablePositionItem({
             )}
           </svg>
         </div>
-        <div>
-          <div className="font-medium text-[#e0e0e0] group-hover:text-[#00ffff] transition-colors">
+
+        {/* Fund Info */}
+        <div className="min-w-0">
+          <div className="font-medium text-[#e0e0e0] group-hover:text-[#00ffff] transition-colors truncate">
             {position.fund_name}
           </div>
           <div className="text-sm text-gray-500">{position.fund_code}</div>
         </div>
       </div>
-      <div className="flex items-center gap-6">
+
+      {/* Right Section: Data Columns */}
+      <div className="flex items-center gap-6 shrink-0">
         <div className="text-right w-20">
           <div className="text-xs text-gray-500">持有份额</div>
           <div className="text-sm text-[#e0e0e0]">{numeral(position.shares).format('0,0.00')}</div>
