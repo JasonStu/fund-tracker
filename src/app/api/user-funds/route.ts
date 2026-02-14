@@ -137,14 +137,62 @@ export async function GET() {
     );
     const valuations = await Promise.all(valuationPromises);
 
-    // Add valuation data to positions
+    // Aggregate positions using FIFO method
     const positionsWithValue = positions.map((position, index) => {
       const valuation = valuations[index];
-      const currentValue = position.shares * valuation.estimatedNav;
-      const totalCost = position.total_buy - position.total_sell;
-      const profit = currentValue - totalCost;
-      const costBasis = position.total_buy - position.total_sell;
-      const profitPercent = costBasis > 0 ? (profit / costBasis) * 100 : 0;
+
+      // Get all transactions for this fund, sorted by date (FIFO)
+      const fundTransactions = (transactions || [])
+        .filter(tx => tx.fund_id === position.id)
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+      // FIFO calculation: track buy lots
+      type BuyLot = { shares: number; cost: number; pricePerShare: number };
+      const buyLots: BuyLot[] = [];
+
+      let currentShares = 0;
+      let totalBuy = 0;
+      let totalSell = 0;
+
+      for (const tx of fundTransactions) {
+        const txShares = Number(tx.shares) || 0;
+        const txPrice = Number(tx.price) || 0;
+
+        if (tx.transaction_type === 'buy') {
+          // Add to buy lots with price per share
+          buyLots.push({ shares: txShares, cost: txShares * txPrice, pricePerShare: txPrice });
+          currentShares += txShares;
+          totalBuy += txShares * txPrice;
+        } else if (tx.transaction_type === 'sell') {
+          // FIFO: deduct from earliest buy lots
+          let sharesToSell = txShares;
+          totalSell += txShares * txPrice;
+
+          while (sharesToSell > 0 && buyLots.length > 0) {
+            const lot = buyLots[0];
+            if (lot.shares <= sharesToSell) {
+              // Consume entire lot
+              sharesToSell -= lot.shares;
+              currentShares -= lot.shares;
+              buyLots.shift();
+            } else {
+              // Partial consumption - reduce shares and cost proportionally
+              lot.shares -= sharesToSell;
+              lot.cost = lot.shares * lot.pricePerShare;
+              currentShares -= sharesToSell;
+              sharesToSell = 0;
+            }
+          }
+          currentShares = Math.max(0, currentShares);
+        }
+      }
+
+      // Calculate remaining cost basis and average cost
+      const remainingCost = buyLots.reduce((sum, lot) => sum + lot.cost, 0);
+      const avgCost = currentShares > 0 ? remainingCost / currentShares : 0;
+
+      const currentValue = currentShares * valuation.estimatedNav;
+      const profit = currentValue - remainingCost;
 
       return {
         ...position,
@@ -152,10 +200,13 @@ export async function GET() {
         estimatedNav: valuation.estimatedNav,
         estimatedChange: valuation.estimatedChange,
         estimatedChangePercent: valuation.estimatedChangePercent,
+        shares: currentShares,
+        avg_cost: avgCost,
+        total_buy: totalBuy,
+        total_sell: totalSell,
         currentValue,
-        totalCost,
         profit,
-        profitPercent,
+        profitPercent: remainingCost > 0 ? (profit / remainingCost) * 100 : 0,
       };
     });
 
