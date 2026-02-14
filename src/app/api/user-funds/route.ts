@@ -181,132 +181,142 @@ interface AddFundBody {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createServerSupabaseClient();
-
-  // Check authentication
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const userId = user.id;
-
-  let body: AddFundBody;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+    const supabase = await createServerSupabaseClient();
 
-  const { fund_code, fund_name, shares: sharesInput = 0, cost: costInput = 0 } = body;
+    // Check authentication
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  // Log raw body for debugging
-  console.log('Raw body:', body);
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  // Convert to numbers and validate
-  const shares = Number(sharesInput);
-  const cost = Number(costInput);
+    const userId = user.id;
 
-  console.log('Parsed values:', { fund_code, fund_name, shares, cost });
+    let body: AddFundBody;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
 
-  if (!fund_code || typeof fund_code !== 'string' || fund_code.trim() === '') {
-    return NextResponse.json({ error: 'fund_code is required and must be a non-empty string' }, { status: 400 });
-  }
+    const { fund_code, fund_name, shares: sharesInput = 0, cost: costInput = 0 } = body;
 
-  if (isNaN(shares) || shares < 0) {
-    return NextResponse.json({ error: 'shares must be a non-negative number' }, { status: 400 });
-  }
+    // Log raw body for debugging
+    console.log('Raw body:', body);
 
-  if (isNaN(cost) || cost < 0) {
-    return NextResponse.json({ error: 'cost must be a non-negative number' }, { status: 400 });
-  }
+    // Convert to numbers and validate
+    const shares = Number(sharesInput);
+    const cost = Number(costInput);
 
-  // Check if fund already exists for this user
-  const { data: existingFund, error: checkError } = await supabase
-    .from('user_funds')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('fund_code', fund_code.trim())
-    .single();
+    console.log('Parsed values:', { fund_code, fund_name, shares, cost });
 
-  if (existingFund) {
-    return NextResponse.json(
-      { error: 'Fund already exists in your portfolio' },
-      { status: 409 }
-    );
-  }
+    if (!fund_code || typeof fund_code !== 'string' || fund_code.trim() === '') {
+      return NextResponse.json({ error: 'fund_code is required and must be a non-empty string' }, { status: 400 });
+    }
 
-  // Get max sort_order for this user
-  const { data: maxOrderData, error: orderError } = await supabase
-    .from('user_funds')
-    .select('sort_order')
-    .eq('user_id', userId)
-    .order('sort_order', { ascending: false })
-    .limit(1)
-    .single();
+    if (isNaN(shares) || shares < 0) {
+      return NextResponse.json({ error: 'shares must be a non-negative number' }, { status: 400 });
+    }
 
-  const newSortOrder = maxOrderData ? (Number(maxOrderData.sort_order) || 0) + 1 : 0;
+    if (isNaN(cost) || cost < 0) {
+      return NextResponse.json({ error: 'cost must be a non-negative number' }, { status: 400 });
+    }
 
-  if (orderError && orderError.code !== 'PGRST116') {
-    console.error('Get max sort_order error:', orderError);
-    return NextResponse.json(
-      { error: 'Failed to determine sort order' },
-      { status: 500 }
-    );
-  }
+    // Check if fund already exists for this user
+    const { data: existingFund, error: checkError } = await supabase
+      .from('user_funds')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('fund_code', fund_code.trim())
+      .single();
 
-  // Insert into user_funds table
-  console.log('Inserting fund:', { fund_code, fund_name, shares, cost, sort_order: newSortOrder });
-  const { data: newFund, error: insertError } = await supabase
-    .from('user_funds')
-    .insert({
-      user_id: userId,
-      fund_code: fund_code.trim(),
-      fund_name: fund_name || null,
-      shares: 0, // Always start with 0, we'll create a transaction for initial shares
-      cost: 0,
-      sort_order: newSortOrder,
-    })
-    .select()
-    .single();
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Check existing fund error:', checkError);
+      return NextResponse.json({ error: checkError.message }, { status: 500 });
+    }
 
-  if (insertError) {
-    console.error('Insert user fund error:', insertError);
-    return NextResponse.json(
-      { error: insertError.message },
-      { status: 500 }
-    );
-  }
+    if (existingFund) {
+      return NextResponse.json({ error: 'Fund already exists', fund_id: existingFund.id }, { status: 409 });
+    }
 
-  // If shares > 0, create initial buy transaction
-  if (shares > 0) {
-    const { error: txError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: userId,
-        fund_id: newFund.id,
-        fund_code: fund_code.trim(),
-        fund_name: fund_name || null,
-        type: 'buy',
-        shares,
-        price: cost,
-        total_amount: shares * cost,
-        notes: 'Initial position',
-      });
+    // Get max sort_order for this user
+    const { data: maxOrderData, error: orderError } = await supabase
+      .from('user_funds')
+      .select('sort_order')
+      .eq('user_id', userId)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .single();
 
-    if (txError) {
-      console.error('Create initial transaction error:', txError);
-      // Fund was created, but transaction failed - still return success with warning
+    const newSortOrder = maxOrderData ? (Number(maxOrderData.sort_order) || 0) + 1 : 0;
+
+    if (orderError && orderError.code !== 'PGRST116') {
+      console.error('Get max sort_order error:', orderError);
       return NextResponse.json(
-        { ...newFund, warning: 'Fund created but initial transaction failed' },
-        { status: 201 }
+        { error: 'Failed to determine sort order' },
+        { status: 500 }
       );
     }
-  }
 
-  return NextResponse.json(newFund, { status: 201 });
+    // Insert into user_funds table
+    console.log('Inserting fund:', { fund_code, fund_name, shares, cost, sort_order: newSortOrder });
+    const { data: newFund, error: insertError } = await supabase
+      .from('user_funds')
+      .insert({
+        user_id: userId,
+        fund_code: fund_code.trim(),
+        fund_name: fund_name || null,
+        shares: 0, // Always start with 0, we'll create a transaction for initial shares
+        cost: 0,
+        sort_order: newSortOrder,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Insert user fund error:', insertError);
+      return NextResponse.json(
+        { error: insertError.message },
+        { status: 500 }
+      );
+    }
+
+    // If shares > 0, create initial buy transaction
+    if (shares > 0) {
+      const { error: txError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: userId,
+          fund_id: newFund.id,
+          fund_code: fund_code.trim(),
+          fund_name: fund_name || null,
+          type: 'buy',
+          shares,
+          price: cost,
+          total_amount: shares * cost,
+          notes: 'Initial position',
+        });
+
+      if (txError) {
+        console.error('Create initial transaction error:', txError);
+        // Fund was created, but transaction failed - still return success with warning
+        return NextResponse.json(
+          { ...newFund, warning: 'Fund created but initial transaction failed' },
+          { status: 201 }
+        );
+      }
+    }
+
+    return NextResponse.json(newFund, { status: 201 });
+  } catch (error) {
+    console.error('POST /api/user-funds error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }
