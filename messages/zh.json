@@ -19,6 +19,11 @@
       "nav": "净值",
       "estNav": "估算净值",
       "estChange": "估算涨幅",
+      "shares": "持有份额",
+      "cost": "成本价",
+      "currentValue": "当前市值",
+      "profit": "累计收益",
+      "profitPercent": "收益率",
       "action": "操作"
     },
     "loading": "加载中..."

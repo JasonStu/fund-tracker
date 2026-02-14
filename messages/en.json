@@ -19,6 +19,11 @@
       "nav": "NAV",
       "estNav": "Est. NAV",
       "estChange": "Est. Change",
+      "shares": "Shares",
+      "cost": "Cost",
+      "currentValue": "Value",
+      "profit": "Profit",
+      "profitPercent": "Return",
       "action": "Action"
     },
     "loading": "Loading data..."
