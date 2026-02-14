@@ -97,10 +97,9 @@ export async function POST(request: Request) {
         fund_id,
         fund_code: fund.fund_code,
         fund_name: fund.fund_name,
-        transaction_type,
+        transaction_type: type,
         shares,
         price,
-        total_amount: shares * price,
         notes: notes || null,
       })
       .select()

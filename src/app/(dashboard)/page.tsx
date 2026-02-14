@@ -5,8 +5,8 @@ import axios from 'axios';
 import { Combobox } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { Position } from '@/types';
+import numeral from 'numeral';
 import { useTranslations } from 'next-intl';
-import PositionCard from '@/components/PositionCard';
 import TransactionModal from '@/components/TransactionModal';
 import AddFundModal from '@/components/AddFundModal';
 
@@ -241,15 +241,90 @@ export default function Home() {
             <p className="text-gray-500">{t('noFunds')}</p>
           </div>
         ) : (
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {positions.map((position) => (
-              <PositionCard
-                key={position.id}
-                position={position}
-                onAddPosition={handleAddPosition}
-                onViewHistory={handleViewHistory}
-              />
-            ))}
+          <div className="divide-y divide-[#2a2a3a]">
+            {positions.map((position) => {
+              const nav = position.estimatedNav || position.nav || 0;
+              const currentValue = position.shares * nav;
+              const totalCost = position.shares * position.avg_cost;
+              const profit = currentValue - totalCost;
+              const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
+
+              return (
+                <div
+                  key={position.id}
+                  className="flex items-center justify-between px-6 py-4 hover:bg-[#1a1a25] transition-colors group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded flex items-center justify-center border ${
+                      profit >= 0
+                        ? 'bg-[#1a1a25] border-[#ff3333]'
+                        : 'bg-[#1a1a25] border-[#33ff33]'
+                    }`}>
+                      <svg className={`w-5 h-5 ${
+                        profit >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
+                      }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        {profit >= 0 ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                        )}
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="font-medium text-[#e0e0e0] group-hover:text-[#00ffff] transition-colors">
+                        {position.fund_name}
+                      </div>
+                      <div className="text-sm text-gray-500">{position.fund_code}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right w-20">
+                      <div className="text-xs text-gray-500">持有份额</div>
+                      <div className="text-sm text-[#e0e0e0]">{numeral(position.shares).format('0,0.0000')}</div>
+                    </div>
+                    <div className="text-right w-20">
+                      <div className="text-xs text-gray-500">成本价</div>
+                      <div className="text-sm text-[#e0e0e0]">{numeral(position.avg_cost).format('0.000000')}</div>
+                    </div>
+                    <div className="text-right w-24">
+                      <div className="text-xs text-gray-500">当前净值</div>
+                      <div className="text-sm text-[#e0e0e0]">{numeral(nav).format('0.0000')}</div>
+                    </div>
+                    <div className="text-right w-24">
+                      <div className="text-xs text-gray-500">当前市值</div>
+                      <div className="text-sm text-[#e0e0e0]">{numeral(currentValue).format('0,0.00')}</div>
+                    </div>
+                    <div className="text-right w-20">
+                      <div className="text-xs text-gray-500">累计收益</div>
+                      <div className={`text-sm font-semibold ${
+                        profit >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
+                      }`}>
+                        {profit >= 0 ? '+' : ''}{numeral(profit).format('0,0.00')}
+                      </div>
+                    </div>
+                    <div className="text-right w-16">
+                      <div className="text-xs text-gray-500">收益率</div>
+                      <div className={`text-sm font-semibold ${
+                        profitPercent >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
+                      }`}>
+                        {profitPercent >= 0 ? '+' : ''}{numeral(profitPercent).format('0.00')}%
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleAddPosition(position.fund_code, position.fund_name)}
+                        className="p-2 text-gray-500 hover:text-[#00ffff] hover:bg-[#1a1a25] rounded transition-colors"
+                        title="加减仓"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
