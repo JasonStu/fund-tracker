@@ -1,5 +1,9 @@
-import axios from 'axios';
+import { createExternalClient } from '@/lib/api/externalClient';
 import { FundDetail, FundHolding, QuarterlyHolding } from '@/types';
+
+// Create eastMoney client for API calls
+const eastMoneyClient = createExternalClient('eastMoney');
+const fundGZClient = createExternalClient('fundGZ');
 
 // Helper to strip HTML tags
 const stripTags = (s: string) => s.replace(/<[^>]+>/g, '').trim();
@@ -59,7 +63,7 @@ export const getFundHistoryNAV = async (code: string, pageSize = 365): Promise<F
   const url = `http://api.fund.eastmoney.com/f10/lsjz`;
   
   try {
-    const response = await axios.get(url, {
+    const response = await eastMoneyClient.get(url, {
       params: {
         fundCode: code,
         pageIndex: 1,
@@ -91,7 +95,7 @@ export const getFundPerformanceData = async (code: string): Promise<FundPerforma
   const url = `http://fund.eastmoney.com/pingzhongdata/${code}.js`;
   
   try {
-    const response = await axios.get(url);
+    const response = await eastMoneyClient.get(url);
     const scriptContent = response.data;
 
     // Extract Net Worth Trend
@@ -119,22 +123,17 @@ export const getFundPerformanceData = async (code: string): Promise<FundPerforma
 
 export const getFundHoldings = async (code: string): Promise<FundDetail> => {
   // 1. Get Fund Basic Info
-  const basicInfoUrl = `http://fundgz.1234567.com.cn/js/${code}.js`;
-  const basicInfoPromise = axios.get(basicInfoUrl).catch(() => ({ data: '' }));
+  const basicInfoUrl = `/js/${code}.js`;
+  const basicInfoPromise = fundGZClient.get(basicInfoUrl).catch(() => ({ data: '' }));
 
   // 2. Get Fund Holdings (EastMoney Web Page Parsing)
   // topline=200 to fetch more data, potentially all holdings for the quarter
-  const holdingsUrl = `http://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code=${code}&topline=20`;
-  const holdingsPromise = axios.get(holdingsUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Referer': 'http://fundf10.eastmoney.com/'
-    }
-  });
+  const holdingsUrl = `/FundArchivesDatas.aspx?type=jjcc&code=${code}&topline=20`;
+  const holdingsPromise = eastMoneyClient.get(holdingsUrl);
 
   // 3. Get Fund Scale (EastMoney JBGK Page)
-  const scaleUrl = `http://fundf10.eastmoney.com/jbgk_${code}.html`;
-  const scalePromise = axios.get(scaleUrl).catch(() => ({ data: '' }));
+  const scaleUrl = `/jbgk_${code}.html`;
+  const scalePromise = eastMoneyClient.get(scaleUrl).catch(() => ({ data: '' }));
 
   // 4. Get Fund Performance Data
   const performancePromise = getFundPerformanceData(code);
