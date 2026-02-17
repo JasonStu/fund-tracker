@@ -169,22 +169,22 @@ function FundCard({
   const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
 
   return (
-    <div ref={setNodeRef} style={style} className="bg-gradient-to-br from-[#0d0d15] to-[#12121a] border border-[#2a2a3a] hover:border-[#00ffff] transition-all duration-300">
+    <div ref={setNodeRef} style={style} className="bg-gradient-to-br from-[#0d0d15] to-[#12121a] border border-[#2a2a3a] hover:border-[#00ffff] transition-all duration-300 overflow-hidden">
       {/* 卡片内容 */}
       <div className="p-4">
         {/* 标题 */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between mb-4 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 bg-[#1a1a25] border border-[#00ffff] rounded flex items-center justify-center shrink-0">
               <svg className="w-4 h-4 text-[#00ffff]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div className="min-w-0">
-              <Link href={`/fund/${position.code}`} className="font-medium text-[#e0e0e0] hover:text-[#00ffff] transition-colors block truncate">
+              <Link href={`/fund/${position.code}`} className="font-medium text-[#e0e0e0] hover:text-[#00ffff] transition-colors block truncate" title={position.name}>
                 {position.name}
               </Link>
-              <div className="text-xs text-gray-500">{position.code}</div>
+              <div className="text-xs text-gray-500 truncate">{position.code}</div>
             </div>
           </div>
           {/* 拖拽手柄 */}
@@ -289,22 +289,22 @@ function StockCard({
   const isUp = dayChangePercent >= 0;
 
   return (
-    <div ref={setNodeRef} style={style} className="bg-gradient-to-br from-[#0d0d15] to-[#12121a] border border-[#2a2a3a] hover:border-[#ff9500] transition-all duration-300">
+    <div ref={setNodeRef} style={style} className="bg-gradient-to-br from-[#0d0d15] to-[#12121a] border border-[#2a2a3a] hover:border-[#ff9500] transition-all duration-300 overflow-hidden">
       {/* 卡片内容 */}
       <div className="p-4">
         {/* 标题 */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between mb-4 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 bg-[#1a1a25] border border-[#ff9500] rounded flex items-center justify-center shrink-0">
               <svg className="w-4 h-4 text-[#ff9500]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
             <div className="min-w-0">
-              <Link href={`/stock/${position.code}`} className="font-medium text-[#e0e0e0] hover:text-[#ff9500] transition-colors block truncate">
+              <Link href={`/stock/${position.code}`} className="font-medium text-[#e0e0e0] hover:text-[#ff9500] transition-colors block truncate" title={position.name}>
                 {position.name}
               </Link>
-              <div className="text-xs text-gray-500">{position.code}</div>
+              <div className="text-xs text-gray-500 truncate">{position.code}</div>
             </div>
           </div>
           {/* 拖拽手柄 */}
