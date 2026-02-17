@@ -743,93 +743,75 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 左右分栏布局 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 左侧：基金板块 */}
-        <div className="bg-gradient-to-br from-[#0d0d15] via-[#12121a] to-[#0d0d15] border border-[#2a2a3a] rounded-none overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#2a2a3a]">
-            <SectionHeader
-              title="我的基金"
-              icon={
-                <svg className="w-5 h-5 text-[#00ffff]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              }
-              color="border-[#00ffff]"
-              count={funds.length}
-            />
-          </div>
+      {/* Tab 切换器 */}
+      <TabSwitcher
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        fundCount={funds.length}
+        stockCount={stocks.length}
+      />
 
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={(e) => handleDragEnd(e, 'fund')}
-          >
-            <SortableContext
-              items={funds.map(p => p.id)}
-              strategy={verticalListSortingStrategy}
+      {/* Tab 内容区域 */}
+      <div className="p-4">
+        {activeTab === 'fund' ? (
+          <div className={`transition-opacity duration-150 ${activeTab === 'fund' ? 'opacity-100' : 'opacity-0'}`}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(e) => handleDragEnd(e, 'fund')}
             >
-              {funds.length === 0 ? (
-                <EmptyState type="fund" />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
-                  {funds.map((position) => (
-                    <FundCard
-                      key={position.id}
-                      position={position}
-                      onAddPosition={handleAddPosition}
-                      onDelete={requestDeletePosition}
-                      onViewHistory={handleViewHistory}
-                    />
-                  ))}
-                </div>
-              )}
-            </SortableContext>
-          </DndContext>
-        </div>
-
-        {/* 右侧：股票板块 */}
-        <div className="bg-gradient-to-br from-[#0d0d15] via-[#12121a] to-[#0d0d15] border border-[#2a2a3a] rounded-none overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#2a2a3a]">
-            <SectionHeader
-              title="我的股票"
-              icon={
-                <svg className="w-5 h-5 text-[#ff9500]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-              }
-              color="border-[#ff9500]"
-              count={stocks.length}
-            />
+              <SortableContext
+                items={funds.map(p => p.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {funds.length === 0 ? (
+                  <EmptyState type="fund" />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {funds.map((position) => (
+                      <FundCard
+                        key={position.id}
+                        position={position}
+                        onAddPosition={handleAddPosition}
+                        onDelete={requestDeletePosition}
+                        onViewHistory={handleViewHistory}
+                      />
+                    ))}
+                  </div>
+                )}
+              </SortableContext>
+            </DndContext>
           </div>
-
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={(e) => handleDragEnd(e, 'stock')}
-          >
-            <SortableContext
-              items={stocks.map(p => p.id)}
-              strategy={verticalListSortingStrategy}
+        ) : (
+          <div className={`transition-opacity duration-150 ${activeTab === 'stock' ? 'opacity-100' : 'opacity-0'}`}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(e) => handleDragEnd(e, 'stock')}
             >
-              {stocks.length === 0 ? (
-                <EmptyState type="stock" />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
-                  {stocks.map((position) => (
-                    <StockCard
-                      key={position.id}
-                      position={position}
-                      onAddPosition={handleAddPosition}
-                      onDelete={requestDeletePosition}
-                      onViewHistory={handleViewHistory}
-                    />
-                  ))}
-                </div>
-              )}
-            </SortableContext>
-          </DndContext>
-        </div>
+              <SortableContext
+                items={stocks.map(p => p.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {stocks.length === 0 ? (
+                  <EmptyState type="stock" />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {stocks.map((position) => (
+                      <StockCard
+                        key={position.id}
+                        position={position}
+                        onAddPosition={handleAddPosition}
+                        onDelete={requestDeletePosition}
+                        onViewHistory={handleViewHistory}
+                      />
+                    ))}
+                  </div>
+                )}
+              </SortableContext>
+            </DndContext>
+          </div>
+        )}
       </div>
 
       {/* 加载状态 */}
