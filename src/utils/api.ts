@@ -2,6 +2,25 @@ import axios from 'axios';
 import iconv from 'iconv-lite';
 import { StockRealtime } from '../types';
 
+// Create axios instance for authenticated API calls
+export const apiClient = axios.create({
+  baseURL: '/api',
+});
+
+// Add response interceptor to handle 401 errors
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid - redirect to login
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login?expired=true';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
 
 export const fetchWithGBK = async (url: string) => {
