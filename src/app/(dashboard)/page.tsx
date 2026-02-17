@@ -446,6 +446,7 @@ export default function Home() {
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyPosition, setHistoryPosition] = useState<{ code: string; name: string; type: InvestmentType } | null>(null);
+  const [activeTab, setActiveTab] = useState<'fund' | 'stock'>('fund');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
