@@ -2,31 +2,12 @@ import axios from 'axios';
 import iconv from 'iconv-lite';
 import { StockRealtime } from '../types';
 
-// Create axios instance for authenticated API calls
-export const apiClient = axios.create({
-  baseURL: '/api',
-});
-
-// Add response interceptor to handle 401 errors
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid - redirect to login
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login?expired=true';
-      }
-    }
-    return Promise.reject(error);
-  }
-);
-
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
 
 export const fetchWithGBK = async (url: string) => {
   const response = await axios.get(url, {
     responseType: 'arraybuffer',
-    headers: { 
+    headers: {
       'User-Agent': USER_AGENT,
       'Referer': 'https://finance.sina.com.cn/'
     }
@@ -36,7 +17,7 @@ export const fetchWithGBK = async (url: string) => {
 
 export const fetchJson = async <T>(url: string): Promise<T> => {
   const response = await axios.get(url, {
-    headers: { 
+    headers: {
       'User-Agent': USER_AGENT,
       'Referer': 'https://finance.sina.com.cn/'
     }
@@ -47,9 +28,9 @@ export const fetchJson = async <T>(url: string): Promise<T> => {
 export const parseSinaStock = (code: string, data: string): StockRealtime | null => {
   const match = data.match(/="(.*)"/); // Removed ; requirement
   if (!match) return null;
-  
+
   const params = match[1].split(',');
-  
+
   let name: string;
   let currentPrice: number;
   let previousClose: number;
@@ -73,7 +54,7 @@ export const parseSinaStock = (code: string, data: string): StockRealtime | null
     change = currentPrice - previousClose;
     changePercent = previousClose === 0 ? 0 : ((currentPrice - previousClose) / previousClose) * 100;
   }
-  
+
   return {
     code,
     name,
@@ -91,5 +72,5 @@ export const getStockMarketCode = (code: string): string => {
   if (code.startsWith('6')) return `sh${code}`;
   if (code.startsWith('0') || code.startsWith('3')) return `sz${code}`;
   if (code.startsWith('sh') || code.startsWith('sz')) return code;
-  return `sh${code}`; 
+  return `sh${code}`;
 };
