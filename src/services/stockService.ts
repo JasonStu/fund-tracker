@@ -1,5 +1,9 @@
-import { fetchWithGBK, parseSinaStock, getStockMarketCode } from '@/utils/api';
+import iconv from 'iconv-lite';
+import { createExternalClient } from '@/lib/api/externalClient';
+import { parseSinaStock, getStockMarketCode } from '@/utils/api';
 import { StockRealtime } from '@/types';
+
+const sinaClient = createExternalClient('sinaStocks');
 
 export const getRealtimeStocks = async (codes: string[]): Promise<StockRealtime[]> => {
   if (codes.length === 0) return [];
@@ -9,10 +13,13 @@ export const getRealtimeStocks = async (codes: string[]): Promise<StockRealtime[
   // Remove duplicates
   const uniqueStockList = Array.from(new Set(stockList));
 
-  const url = `https://hq.sinajs.cn/list=${uniqueStockList.join(',')}`;
-  
+  const url = `/list=${uniqueStockList.join(',')}`;
+
   try {
-    const data = await fetchWithGBK(url);
+    const response = await sinaClient.get(url, {
+      responseType: 'arraybuffer',
+    });
+    const data = iconv.decode(response.data, 'gbk');
     const stocks: StockRealtime[] = [];
     
     const lines = data.split(';');
