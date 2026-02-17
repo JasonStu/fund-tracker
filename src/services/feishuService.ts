@@ -3,7 +3,8 @@
  * Handles authentication and API calls to Feishu/Lark Open Platform
  */
 
-import axios, { AxiosInstance } from 'axios';
+import { AxiosInstance } from 'axios';
+import { createExternalClient } from '@/lib/api/externalClient';
 import {
   FeishuConfig,
   FeishuTokenResponse,
@@ -14,13 +15,12 @@ import {
   CreateTableResponse,
 } from '@/types/feishu';
 
-// Base URLs for Feishu API
-const FEISHU_BASE_URL = 'https://open.feishu.cn/open-apis';
-const FEISHU_API_VERSION = 'v1';
-
 // Token cache
 let cachedToken: string | null = null;
 let tokenExpiry: number = 0;
+
+// Create Feishu API client using external client factory
+const feishuClient = createExternalClient('feishu');
 
 /**
  * Get Feishu configuration from environment variables
@@ -46,16 +46,11 @@ export async function getTenantAccessToken(): Promise<string> {
 
   const config = getFeishuConfig();
   try {
-    const response = await axios.post<FeishuTokenResponse>(
-      `${FEISHU_BASE_URL}/auth/v3/tenant_access_token/internal`,
+    const response = await feishuClient.post<FeishuTokenResponse>(
+      '/auth/v3/tenant_access_token/internal',
       {
         app_id: config.appId,
         app_secret: config.appSecret,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-        },
       }
     );
 
@@ -71,7 +66,7 @@ export async function getTenantAccessToken(): Promise<string> {
 
     return cachedToken;
   } catch (error) {
-    if (axios.isAxiosError(error)) {
+    if (feishuClient.isAxiosError(error)) {
       const status = error.response?.status;
       const responseData = error.response?.data;
       console.error('Feishu API Error:', { status, data: responseData, url: error.config?.url });
@@ -83,14 +78,10 @@ export async function getTenantAccessToken(): Promise<string> {
 
 /**
  * Create axios instance with Feishu authentication
+ * @deprecated Use the module-level feishuClient instead
  */
 export function createFeishuClient(): AxiosInstance {
-  return axios.create({
-    baseURL: FEISHU_BASE_URL,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-    },
-  });
+  return feishuClient;
 }
 
 /**
@@ -133,7 +124,7 @@ export class FeishuService {
 
       return data.data.app_token;
     } catch (error) {
-      if (axios.isAxiosError(error)) {
+      if (feishuClient.isAxiosError(error)) {
         console.error('[Feishu] Create bitable error:', {
           status: error.response?.status,
           data: error.response?.data,
@@ -188,7 +179,7 @@ export class FeishuService {
 
       return data.data.table_id;
     } catch (error) {
-      if (axios.isAxiosError(error)) {
+      if (feishuClient.isAxiosError(error)) {
         console.error('[Feishu] Create table error:', {
           status: error.response?.status,
           data: error.response?.data,
@@ -320,20 +311,18 @@ export class FeishuService {
 
       console.log('[Feishu] Final fields:', JSON.stringify(mappedFields, null, 2));
 
-      const url = `${FEISHU_BASE_URL}/bitable/v1/apps/${appToken}/tables/${tableId}/records`;
       const token = await getTenantAccessToken();
 
       // Ensure proper JSON serialization
       const requestBody = JSON.stringify({ fields: mappedFields });
       console.log('[Feishu] Request body:', requestBody);
 
-      const response = await axios.post(
-        url,
+      const response = await feishuClient.post(
+        `/bitable/v1/apps/${appToken}/tables/${tableId}/records`,
         requestBody,
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
           },
         }
       );
@@ -348,7 +337,7 @@ export class FeishuService {
       console.log('[Feishu] Record inserted successfully');
       return data.data.record.record_id;
     } catch (error) {
-      if (axios.isAxiosError(error)) {
+      if (feishuClient.isAxiosError(error)) {
         console.error('[Feishu] Insert error:', {
           status: error.response?.status,
           data: JSON.stringify(error.response?.data, null, 2),
