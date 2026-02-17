@@ -47,10 +47,10 @@ class ApiClient {
     );
   }
 
-  private transformError(error: AxiosError): ApiError {
+  private transformError(error: AxiosError<{ code?: string; message?: string; details?: Record<string, unknown> }>): ApiError {
     const response = error.response;
     if (response) {
-      const data = response.data as any;
+      const data = response.data;
       return new ApiError(
         data?.code || ErrorCodes.INTERNAL_ERROR,
         data?.message || error.message,
@@ -73,7 +73,7 @@ class ApiClient {
     }
   }
 
-  async post<T>(url: string, data?: any, config?: RequestConfig): Promise<ApiResponse<T>> {
+  async post<T>(url: string, data?: Record<string, unknown>, config?: RequestConfig): Promise<ApiResponse<T>> {
     try {
       const response = await this.client.post<T>(url, data, { timeout: config?.timeout });
       return { data: response.data, success: true };
@@ -82,7 +82,7 @@ class ApiClient {
     }
   }
 
-  async put<T>(url: string, data?: any, config?: RequestConfig): Promise<ApiResponse<T>> {
+  async put<T>(url: string, data?: Record<string, unknown>, config?: RequestConfig): Promise<ApiResponse<T>> {
     try {
       const response = await this.client.put<T>(url, data, { timeout: config?.timeout });
       return { data: response.data, success: true };
