@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { apiClient } from '@/utils/api';
 import { Combobox } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { Position } from '@/types';
@@ -214,7 +214,7 @@ export default function Home() {
 
       // Save new sort order to API
       try {
-        await axios.put('/api/user-funds/sort', newPositions.map((p, index) => ({
+        await apiClient.put('/user-funds/sort', newPositions.map((p, index) => ({
           id: p.id,
           sort_order: index,
         })));
@@ -230,7 +230,7 @@ export default function Home() {
   const fetchPositions = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/user-funds');
+      const res = await apiClient.get('/user-funds');
       setPositions(res.data.positions || []);
     } catch (e) {
       console.error('Failed to fetch positions', e);
@@ -251,7 +251,7 @@ export default function Home() {
 
     const timeoutId = setTimeout(async () => {
       try {
-        const res = await axios.get(`/api/funds/search?q=${encodeURIComponent(query)}`);
+        const res = await apiClient.get(`/funds/search?q=${encodeURIComponent(query)}`);
         setSearchResults(res.data.funds || []);
       } catch (e) {
         console.error(e);
@@ -273,7 +273,7 @@ export default function Home() {
   const handleAddFundConfirm = async ({ shares, cost }: { shares: number; cost: number }) => {
     if (!pendingFund) return;
     try {
-      await axios.post('/api/user-funds', {
+      await apiClient.post('/user-funds', {
         fund_code: pendingFund.code || '',
         fund_name: pendingFund.name || '',
         shares: shares || 0,
@@ -312,7 +312,7 @@ export default function Home() {
   }) => {
     if (!selectedPosition) return;
     try {
-      await axios.post('/api/user-funds/transactions', {
+      await apiClient.post('/user-funds/transactions', {
         fund_id: selectedPosition.id,
         type: data.type,
         shares: data.shares,
@@ -337,7 +337,7 @@ export default function Home() {
   const confirmDeleteFund = async () => {
     if (!pendingDelete) return;
     try {
-      await axios.delete(`/api/user-funds/positions/${pendingDelete.id}`);
+      await apiClient.delete(`/user-funds/positions/${pendingDelete.id}`);
       await fetchPositions();
     } catch (e) {
       console.error('Failed to remove fund', e);
