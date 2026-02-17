@@ -3,7 +3,7 @@
  * Handles authentication and API calls to Feishu/Lark Open Platform
  */
 
-import { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosError, isAxiosError } from 'axios';
 import { createExternalClient } from '@/lib/api/externalClient';
 import {
   FeishuConfig,
@@ -66,10 +66,11 @@ export async function getTenantAccessToken(): Promise<string> {
 
     return cachedToken;
   } catch (error) {
-    if (feishuClient.isAxiosError(error)) {
-      const status = error.response?.status;
-      const responseData = error.response?.data;
-      console.error('Feishu API Error:', { status, data: responseData, url: error.config?.url });
+    if (isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ code?: number; msg?: string }>;
+      const status = axiosError.response?.status;
+      const responseData = axiosError.response?.data;
+      console.error('Feishu API Error:', { status, data: responseData, url: axiosError.config?.url });
       throw new Error(`Feishu API error ${status}: ${JSON.stringify(responseData)}`);
     }
     throw error;
@@ -124,13 +125,14 @@ export class FeishuService {
 
       return data.data.app_token;
     } catch (error) {
-      if (feishuClient.isAxiosError(error)) {
+      if (isAxiosError(error)) {
+        const axiosError = error as AxiosError<{ code?: number; msg?: string }>;
         console.error('[Feishu] Create bitable error:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message
+          status: axiosError.response?.status,
+          data: axiosError.response?.data,
+          message: axiosError.message
         });
-        throw new Error(`Feishu API error: ${JSON.stringify(error.response?.data)}`);
+        throw new Error(`Feishu API error: ${JSON.stringify(axiosError.response?.data)}`);
       }
       throw error;
     }
@@ -179,13 +181,14 @@ export class FeishuService {
 
       return data.data.table_id;
     } catch (error) {
-      if (feishuClient.isAxiosError(error)) {
+      if (isAxiosError(error)) {
+        const axiosError = error as AxiosError<{ code?: number; msg?: string }>;
         console.error('[Feishu] Create table error:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message
+          status: axiosError.response?.status,
+          data: axiosError.response?.data,
+          message: axiosError.message
         });
-        throw new Error(`Feishu API error: ${JSON.stringify(error.response?.data)}`);
+        throw new Error(`Feishu API error: ${JSON.stringify(axiosError.response?.data)}`);
       }
       throw error;
     }
@@ -337,14 +340,15 @@ export class FeishuService {
       console.log('[Feishu] Record inserted successfully');
       return data.data.record.record_id;
     } catch (error) {
-      if (feishuClient.isAxiosError(error)) {
+      if (isAxiosError(error)) {
+        const axiosError = error as AxiosError<{ code?: number; msg?: string }>;
         console.error('[Feishu] Insert error:', {
-          status: error.response?.status,
-          data: JSON.stringify(error.response?.data, null, 2),
+          status: axiosError.response?.status,
+          data: JSON.stringify(axiosError.response?.data, null, 2),
         });
 
         // 常见错误处理
-        const errorData = error.response?.data;
+        const errorData = axiosError.response?.data as { code?: number } | undefined;
         const errorCode = errorData?.code;
 
         if (errorCode === 91403) {
@@ -361,7 +365,7 @@ export class FeishuService {
 `);
         }
 
-        throw new Error(`Feishu API error: ${JSON.stringify(error.response?.data)}`);
+        throw new Error(`Feishu API error: ${JSON.stringify(axiosError.response?.data)}`);
       }
       throw error;
     }

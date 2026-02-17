@@ -6,6 +6,18 @@ export interface Fund {
   navDate: string; // 净值日期
 }
 
+// 投资品种类型
+export type InvestmentType = 'fund' | 'stock';
+
+// 搜索结果类型
+export interface SearchResult {
+  code: string;
+  name: string;
+  type: InvestmentType;
+  currentPrice?: number; // 股票实时价格
+  nav?: number; // 基金净值
+}
+
 export interface FundHolding {
   stockCode: string;
   stockName: string;
@@ -74,10 +86,10 @@ export interface FundRealtimeValuation {
 export interface UserFund {
   id: string;
   user_id: string;
-  fund_code: string;
-  fund_name: string;
-  shares: number;
-  cost: number;
+  type: InvestmentType;
+  code: string;
+  name: string;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -93,11 +105,17 @@ export interface UserFundWithValue extends UserFund {
   profitPercent: number;
 }
 
+// 股票实时行情扩展
+export interface StockRealtimeWithCode extends StockRealtime {
+  code: string;
+}
+
 export interface Position {
   id: string;
   user_id: string;
-  fund_code: string;
-  fund_name: string;
+  type: InvestmentType; // 投资品种类型
+  code: string;
+  name: string;
   sort_order: number;
   shares: number;
   avg_cost: number;
@@ -117,14 +135,26 @@ export interface Position {
 export interface Transaction {
   id: string;
   user_id: string;
-  fund_id: string;
-  fund_code: string;
-  fund_name: string;
+  type: InvestmentType;
+  code: string;
+  name: string;
   transaction_type: 'buy' | 'sell';
   shares: number;
   price: number;
   notes?: string;
   created_at: string;
+  updated_at: string;
+}
+
+// 交易历史记录项（带计算字段）
+export interface TransactionRecord extends Transaction {
+  dayTrade?: {
+    isDayTrade: boolean;
+    pairedTransactionId?: string;
+    priceDiff?: number;
+    profit?: number;
+    pairedTransaction?: Transaction;
+  };
 }
 
 export interface TransactionData {

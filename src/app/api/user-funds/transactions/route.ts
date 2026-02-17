@@ -13,7 +13,6 @@ export async function POST(request: Request) {
   try {
     const supabase = await createServerSupabaseClient();
 
-    // Check authentication
     const {
       data: { user },
       error: authError,
@@ -34,7 +33,6 @@ export async function POST(request: Request) {
 
     const { fund_id, type, shares, price, notes } = body;
 
-    // Validate required fields
     if (!fund_id || typeof fund_id !== 'string') {
       return NextResponse.json(
         { error: 'fund_id is required and must be a string' },
@@ -63,26 +61,26 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify fund exists and belongs to user
-    const { data: fund, error: fundError } = await supabase
+    // Verify position exists and belongs to user
+    const { data: position, error: positionError } = await supabase
       .from('user_funds')
-      .select('id, fund_code, fund_name')
+      .select('id, fund_code, fund_name, type')
       .eq('id', fund_id)
       .eq('user_id', userId)
       .single();
 
-    if (fundError || !fund) {
+    if (positionError || !position) {
       return NextResponse.json(
-        { error: 'Fund not found or access denied' },
+        { error: 'Position not found or access denied' },
         { status: 404 }
       );
     }
 
-    // Calculate current shares from transactions using fund_code
+    // Calculate current shares from transactions
     const { data: transactions, error: txError } = await supabase
       .from('fund_transactions')
       .select('shares, transaction_type')
-      .eq('fund_code', fund.fund_code)
+      .eq('fund_code', position.fund_code)
       .eq('user_id', userId);
 
     if (txError) {
@@ -99,7 +97,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Validate sell operation has sufficient shares
     if (type === 'sell' && shares > currentShares) {
       return NextResponse.json(
         { error: 'Insufficient shares for sell operation' },
@@ -107,13 +104,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create transaction record
+    // Create transaction record with type field
     const { data: transaction, error: transactionError } = await supabase
       .from('fund_transactions')
       .insert({
         user_id: userId,
-        fund_code: fund.fund_code,
-        fund_name: fund.fund_name,
+        fund_code: position.fund_code,
+        fund_name: position.fund_name,
+        type: position.type,
         transaction_type: type,
         shares,
         price,
@@ -144,7 +142,6 @@ export async function GET() {
   try {
     const supabase = await createServerSupabaseClient();
 
-    // Check authentication
     const {
       data: { session },
       error: authError,

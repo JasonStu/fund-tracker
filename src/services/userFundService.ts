@@ -1,4 +1,5 @@
-import { apiClient, ApiResponse } from '@/lib/api/client';
+import { apiClient } from '@/lib/api/client';
+import { ApiResponse } from '@/lib/api/types';
 import { Position, Transaction } from '@/types';
 
 export const userFundService = {
@@ -6,11 +7,11 @@ export const userFundService = {
     return apiClient.get('/user-funds');
   },
 
-  async addFund(params: { fund_code: string; fund_name: string; shares: number; cost: number }) {
+  async addPosition(params: { type: 'fund' | 'stock'; code: string; name: string; shares: number; cost: number }) {
     return apiClient.post('/user-funds', params);
   },
 
-  async deleteFund(id: string) {
+  async deletePosition(id: string) {
     return apiClient.delete(`/user-funds/positions/${id}`);
   },
 

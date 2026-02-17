@@ -3,43 +3,46 @@
 import { useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/20/solid';
+import { InvestmentType } from '@/types';
 
-interface AddFundModalProps {
+interface AddPositionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: { shares: number; cost: number }) => void;
-  fundName: string;
-  fundCode: string;
+  result: { code: string; name: string; type: InvestmentType } | null;
 }
 
-export default function AddFundModal({
+export default function AddPositionModal({
   isOpen,
   onClose,
   onSubmit,
-  fundName,
-  fundCode,
-}: AddFundModalProps) {
+  result,
+}: AddPositionModalProps) {
   const [shares, setShares] = useState('');
   const [cost, setCost] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Allow empty strings, default to 0
-    const sharesValue = shares === '' ? 0 : parseFloat(shares);
-    const costValue = cost === '' ? 0 : parseFloat(cost);
     onSubmit({
-      shares: sharesValue,
-      cost: costValue,
+      shares: shares === '' ? 0 : parseFloat(shares),
+      cost: cost === '' ? 0 : parseFloat(cost),
     });
+    resetForm();
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const resetForm = () => {
     setShares('');
     setCost('');
   };
 
-  const handleClose = () => {
-    setShares('');
-    setCost('');
-    onClose();
-  };
+  if (!result) return null;
+
+  const isStock = result.type === 'stock';
 
   return (
     <Dialog open={isOpen} onClose={handleClose} className="relative z-50">
@@ -49,7 +52,7 @@ export default function AddFundModal({
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <Dialog.Title className="text-lg font-bold flex items-center gap-2">
-              <span className="text-[#00ffff]">添加持仓</span>
+              <span className="text-[#00ffff]">添加{isStock ? '股票' : '基金'}</span>
             </Dialog.Title>
             <button
               onClick={handleClose}
@@ -60,18 +63,26 @@ export default function AddFundModal({
             </button>
           </div>
 
-          {/* Fund Info */}
+          {/* Result Info */}
           <div className="mb-6 p-3 rounded bg-[#0d0d15] border border-[#2a2a3a]">
-            <div className="text-sm text-gray-400">基金名称</div>
-            <div className="text-[#e0e0e0] font-medium">{fundName}</div>
-            <div className="text-xs text-gray-500 font-mono mt-1">{fundCode}</div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs px-1.5 py-0.5 rounded ${
+                isStock
+                  ? 'bg-[#ff9500]/20 text-[#ff9500]'
+                  : 'bg-[#00ffff]/20 text-[#00ffff]'
+              }`}>
+                {isStock ? '股票' : '基金'}
+              </span>
+            </div>
+            <div className="text-[#e0e0e0] font-medium mt-2">{result.name}</div>
+            <div className="text-xs text-gray-500 font-mono mt-1">{result.code}</div>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="shares" className="block text-sm font-medium text-gray-300 mb-1.5">
-                份额
+                {isStock ? '持股数' : '持有份额'}
               </label>
               <input
                 type="number"
@@ -80,7 +91,7 @@ export default function AddFundModal({
                 min="0"
                 value={shares}
                 onChange={(e) => setShares(e.target.value)}
-                placeholder="请输入份额"
+                placeholder="请输入数量"
                 className="w-full px-3 py-2.5 rounded bg-[#0d0d15] border border-[#2a2a3a] text-[#e0e0e0] placeholder-gray-600 focus:outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff] transition-colors"
                 required
               />
@@ -88,7 +99,7 @@ export default function AddFundModal({
 
             <div>
               <label htmlFor="cost" className="block text-sm font-medium text-gray-300 mb-1.5">
-                成本
+                成本{isStock ? '价' : '（单价)'}
               </label>
               <input
                 type="number"
@@ -97,7 +108,7 @@ export default function AddFundModal({
                 min="0"
                 value={cost}
                 onChange={(e) => setCost(e.target.value)}
-                placeholder="请输入成本"
+                placeholder="请输入成本价"
                 className="w-full px-3 py-2.5 rounded bg-[#0d0d15] border border-[#2a2a3a] text-[#e0e0e0] placeholder-gray-600 focus:outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff] transition-colors"
                 required
               />
@@ -116,7 +127,7 @@ export default function AddFundModal({
                 type="submit"
                 className="flex-1 px-4 py-2.5 text-sm font-medium bg-[#00ffff] text-[#1a1a25] hover:bg-[#00ffff]/90 rounded font-medium transition-colors"
               >
-                确认添加
+                添加
               </button>
             </div>
           </form>

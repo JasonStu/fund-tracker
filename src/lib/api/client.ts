@@ -42,7 +42,7 @@ class ApiClient {
             window.location.href = '/login?expired=true';
           }
         }
-        return Promise.reject(this.transformError(error));
+        return Promise.reject(this.transformError(error as AxiosError<{ code?: string; message?: string; details?: Record<string, unknown> }>));
       }
     );
   }
@@ -82,7 +82,7 @@ class ApiClient {
     }
   }
 
-  async put<T>(url: string, data?: Record<string, unknown>, config?: RequestConfig): Promise<ApiResponse<T>> {
+  async put<T>(url: string, data?: unknown, config?: RequestConfig): Promise<ApiResponse<T>> {
     try {
       const response = await this.client.put<T>(url, data, { timeout: config?.timeout });
       return { data: response.data, success: true };

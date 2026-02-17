@@ -25,7 +25,6 @@ async function getFundRealtimeValuation(fundCode: string) {
   } catch (error) {
     console.error(`Fetch fund ${fundCode} valuation failed:`, error);
   }
-  // Return default values if fetch fails
   return {
     nav: 0,
     estimatedNav: 0,
@@ -35,12 +34,54 @@ async function getFundRealtimeValuation(fundCode: string) {
   };
 }
 
+// Helper to fetch stock realtime price from EastMoney
+async function getStockRealtimePrice(stockCode: string) {
+  try {
+    // Convert to market code format
+    let market = '';
+    if (stockCode.startsWith('6')) {
+      market = '1'; // Shanghai
+    } else if (stockCode.startsWith('0') || stockCode.startsWith('3')) {
+      market = '0'; // Shenzhen
+    }
+
+    const url = `https://push2.eastmoney.com/api/qt/stock/get?` +
+      `fields=f43,f57,f58,f86,f204,f205,f169,f170&` +
+      `fltt=2&` +
+      `invt=2&` +
+      `secid=${market}.${stockCode}`;
+
+    const response = await axios.get(url, { timeout: 5000 });
+    const data = response.data;
+
+    if (data && data.data) {
+      const f43 = parseFloat(data.data.f43) || 0; // Current price
+      const f57 = parseFloat(data.data.f57) || 0; // Previous close
+      const f86 = parseFloat(data.data.f86) || 0; // Volume
+      return {
+        currentPrice: f43,
+        previousClose: f57,
+        change: f43 - f57,
+        changePercent: f57 > 0 ? ((f43 - f57) / f57) * 100 : 0,
+        volume: f86,
+      };
+    }
+  } catch (error) {
+    console.error(`Fetch stock ${stockCode} price failed:`, error);
+  }
+  return {
+    currentPrice: 0,
+    previousClose: 0,
+    change: 0,
+    changePercent: 0,
+    volume: 0,
+  };
+}
+
 export async function GET() {
   try {
-    // Create Supabase client with auth context
     const supabase = await createServerSupabaseClient();
 
-    // Check authentication
     const {
       data: { session },
       error: authError,
@@ -52,17 +93,17 @@ export async function GET() {
 
     const userId = session.user.id;
 
-    // Fetch user's funds from user_funds table with sort_order
-    const { data: userFunds, error: fundsError } = await supabase
+    // Fetch user's holdings from user_funds table
+    const { data: userHoldings, error: holdingsError } = await supabase
       .from('user_funds')
       .select('*')
       .eq('user_id', userId)
       .order('sort_order', { ascending: true });
 
-    if (fundsError) {
-      console.error('Fetch user funds error:', fundsError);
+    if (holdingsError) {
+      console.error('Fetch user holdings error:', holdingsError);
       return NextResponse.json(
-        { error: 'Failed to fetch user funds' },
+        { error: 'Failed to fetch user holdings' },
         { status: 500 }
       );
     }
@@ -82,17 +123,22 @@ export async function GET() {
       );
     }
 
-    // Aggregate position data by fund_code (since fund_transactions uses fund_code, not fund_id)
+    // Aggregate position data
     const positionMap = new Map<string, Position>();
 
     // Initialize positions from user_funds
-    for (const fund of userFunds) {
-      positionMap.set(fund.fund_code, {
-        id: fund.id,
-        user_id: fund.user_id,
-        fund_code: fund.fund_code,
-        fund_name: fund.fund_name || `Fund ${fund.fund_code}`,
-        sort_order: fund.sort_order || 0,
+    for (const holding of userHoldings || []) {
+      const type = holding.type || 'fund';
+      const code = holding.fund_code;
+      const name = holding.fund_name || (type === 'stock' ? `Stock ${code}` : `Fund ${code}`);
+
+      positionMap.set(code, {
+        id: holding.id,
+        user_id: holding.user_id,
+        type,
+        code,
+        name,
+        sort_order: holding.sort_order || 0,
         shares: 0,
         avg_cost: 0,
         total_buy: 0,
@@ -104,12 +150,12 @@ export async function GET() {
         currentValue: 0,
         profit: 0,
         profitPercent: 0,
-        created_at: fund.created_at,
-        updated_at: fund.updated_at,
+        created_at: holding.created_at,
+        updated_at: holding.updated_at,
       });
     }
 
-    // Aggregate transactions
+    // Aggregate transactions using FIFO
     for (const tx of transactions || []) {
       const position = positionMap.get(tx.fund_code);
       if (!position) continue;
@@ -118,7 +164,6 @@ export async function GET() {
       const txPrice = Number(tx.price) || 0;
 
       if (tx.transaction_type === 'buy') {
-        // Calculate new average cost
         const currentShares = position.shares;
         const newShares = currentShares + txShares;
         const totalBuyCost = position.total_buy + (txShares * txPrice);
@@ -138,33 +183,27 @@ export async function GET() {
     const positions: Position[] = Array.from(positionMap.values())
       .sort((a, b) => a.sort_order - b.sort_order);
 
-    // Fetch realtime valuations for each position in parallel
-    const valuationPromises = positions.map((position) =>
-      getFundRealtimeValuation(position.fund_code)
-    );
-    const valuations = await Promise.all(valuationPromises);
+    // Fetch realtime valuations/prices for each position in parallel
+    const fetchPromises = positions.map(async (position) => {
+      if (position.type === 'stock') {
+        return await getStockRealtimePrice(position.code);
+      } else {
+        return await getFundRealtimeValuation(position.code);
+      }
+    });
 
-    // Aggregate positions using FIFO method
+    const valuations = await Promise.all(fetchPromises);
+
+    // Calculate positions with FIFO method
     const positionsWithValue = positions.map((position, index) => {
       const valuation = valuations[index];
 
-      // Get all transactions for this fund, sorted by date (FIFO)
-      // Use fund_code to match since fund_transactions table doesn't have fund_id
-      const fundTransactions = (transactions || [])
-        .filter(tx => tx.fund_code === position.fund_code)
+      // Get all transactions for this position
+      const positionTransactions = (transactions || [])
+        .filter(tx => tx.fund_code === position.code)
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-      console.log(`[DEBUG] Fund ${position.fund_code}:`, {
-        txCount: fundTransactions.length,
-        transactions: fundTransactions.map(tx => ({
-          type: tx.transaction_type,
-          shares: tx.shares,
-          price: tx.price,
-          created: tx.created_at
-        }))
-      });
-
-      // FIFO calculation: track buy lots
+      // FIFO calculation
       type BuyLot = { shares: number; cost: number; pricePerShare: number };
       const buyLots: BuyLot[] = [];
 
@@ -172,29 +211,25 @@ export async function GET() {
       let totalBuy = 0;
       let totalSell = 0;
 
-      for (const tx of fundTransactions) {
+      for (const tx of positionTransactions) {
         const txShares = Number(tx.shares) || 0;
         const txPrice = Number(tx.price) || 0;
 
         if (tx.transaction_type === 'buy') {
-          // Add to buy lots with price per share
           buyLots.push({ shares: txShares, cost: txShares * txPrice, pricePerShare: txPrice });
           currentShares += txShares;
           totalBuy += txShares * txPrice;
         } else if (tx.transaction_type === 'sell') {
-          // FIFO: deduct from earliest buy lots
           let sharesToSell = txShares;
           totalSell += txShares * txPrice;
 
           while (sharesToSell > 0 && buyLots.length > 0) {
             const lot = buyLots[0];
             if (lot.shares <= sharesToSell) {
-              // Consume entire lot
               sharesToSell -= lot.shares;
               currentShares -= lot.shares;
               buyLots.shift();
             } else {
-              // Partial consumption - reduce shares and cost proportionally
               lot.shares -= sharesToSell;
               lot.cost = lot.shares * lot.pricePerShare;
               currentShares -= sharesToSell;
@@ -205,14 +240,13 @@ export async function GET() {
         }
       }
 
-      // Calculate remaining cost basis and average cost
       const remainingCost = buyLots.reduce((sum, lot) => sum + lot.cost, 0);
       const avgCost = currentShares > 0 ? remainingCost / currentShares : 0;
 
-      // Calculate realized profit from all sells (FIFO cost basis)
+      // Calculate realized profit
       let realizedCost = 0;
       const tempLots: BuyLot[] = [];
-      for (const tx of fundTransactions) {
+      for (const tx of positionTransactions) {
         const txShares = Number(tx.shares) || 0;
         const txPrice = Number(tx.price) || 0;
         if (tx.transaction_type === 'buy') {
@@ -234,35 +268,29 @@ export async function GET() {
         }
       }
 
-      // Total profit = realized profit + unrealized profit
       const realizedProfit = totalSell - realizedCost;
-      const unrealizedProfit = (currentShares * valuation.estimatedNav) - remainingCost;
+      const estimatedNav = position.type === 'stock'
+        ? (valuation as any).currentPrice || 0
+        : (valuation as any).estimatedNav || 0;
+      const unrealizedProfit = (currentShares * estimatedNav) - remainingCost;
       const totalProfit = realizedProfit + unrealizedProfit;
 
-      console.log(`[DEBUG] Fund ${position.fund_code} FIFO result:`, {
-        shares: currentShares,
-        avgCost,
-        remainingCost,
-        totalBuy,
-        totalSell,
-        buyLots: buyLots.map(lot => ({
-          shares: lot.shares,
-          cost: lot.cost,
-          pricePerShare: lot.pricePerShare
-        })),
-        realizedProfit,
-        unrealizedProfit,
-        totalProfit
-      });
-
-      const currentValue = currentShares * valuation.estimatedNav;
+      const currentValue = currentShares * estimatedNav;
+      const estimatedChange = position.type === 'stock'
+        ? (valuation as any).change || 0
+        : (valuation as any).estimatedChange || 0;
+      const estimatedChangePercent = position.type === 'stock'
+        ? (valuation as any).changePercent || 0
+        : (valuation as any).estimatedChangePercent || 0;
 
       return {
         ...position,
-        nav: valuation.nav,
-        estimatedNav: valuation.estimatedNav,
-        estimatedChange: valuation.estimatedChange,
-        estimatedChangePercent: valuation.estimatedChangePercent,
+        nav: position.type === 'stock'
+          ? (valuation as any).previousClose || 0
+          : (valuation as any).nav || 0,
+        estimatedNav,
+        estimatedChange,
+        estimatedChangePercent,
         shares: currentShares,
         avg_cost: avgCost,
         total_buy: totalBuy,
@@ -273,7 +301,6 @@ export async function GET() {
       };
     });
 
-    // Return both positions and transactions
     return NextResponse.json({
       positions: positionsWithValue,
       transactions: transactions || [],
@@ -287,9 +314,10 @@ export async function GET() {
   }
 }
 
-interface AddFundBody {
-  fund_code: string;
-  fund_name?: string;
+interface AddPositionBody {
+  type?: 'fund' | 'stock';
+  code: string;
+  name?: string;
   shares?: number;
   cost?: number;
 }
@@ -298,7 +326,6 @@ export async function POST(request: Request) {
   try {
     const supabase = await createServerSupabaseClient();
 
-    // Check authentication
     const {
       data: { user },
       error: authError,
@@ -309,55 +336,56 @@ export async function POST(request: Request) {
     }
 
     const userId = user.id;
+    let body: AddPositionBody;
 
-    let body: AddFundBody;
     try {
       body = await request.json();
     } catch {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
-    const { fund_code, fund_name, shares: sharesInput = 0, cost: costInput = 0 } = body;
+    const {
+      type = 'fund',
+      code,
+      name,
+      shares: sharesInput = 0,
+      cost: costInput = 0,
+    } = body;
 
-    // Log raw body for debugging
-    console.log('Raw body:', body);
+    if (!code || typeof code !== 'string' || code.trim() === '') {
+      return NextResponse.json({ error: 'code is required' }, { status: 400 });
+    }
 
-    // Convert to numbers and validate
     const shares = Number(sharesInput);
     const cost = Number(costInput);
 
-    console.log('Parsed values:', { fund_code, fund_name, shares, cost });
-
-    if (!fund_code || typeof fund_code !== 'string' || fund_code.trim() === '') {
-      return NextResponse.json({ error: 'fund_code is required and must be a non-empty string' }, { status: 400 });
-    }
-
     if (isNaN(shares) || shares < 0) {
-      return NextResponse.json({ error: 'shares must be a non-negative number' }, { status: 400 });
+      return NextResponse.json({ error: 'shares must be non-negative' }, { status: 400 });
     }
 
     if (isNaN(cost) || cost < 0) {
-      return NextResponse.json({ error: 'cost must be a non-negative number' }, { status: 400 });
+      return NextResponse.json({ error: 'cost must be non-negative' }, { status: 400 });
     }
 
-    // Check if fund already exists for this user
-    const { data: existingFund, error: checkError } = await supabase
+    // Check if position already exists
+    const { data: existingPosition, error: checkError } = await supabase
       .from('user_funds')
       .select('id')
       .eq('user_id', userId)
-      .eq('fund_code', fund_code.trim())
+      .eq('fund_code', code.trim())
+      .eq('type', type)
       .single();
 
     if (checkError && checkError.code !== 'PGRST116') {
-      console.error('Check existing fund error:', checkError);
+      console.error('Check existing position error:', checkError);
       return NextResponse.json({ error: checkError.message }, { status: 500 });
     }
 
-    if (existingFund) {
-      return NextResponse.json({ error: 'Fund already exists', fund_id: existingFund.id }, { status: 409 });
+    if (existingPosition) {
+      return NextResponse.json({ error: 'Position already exists', id: existingPosition.id }, { status: 409 });
     }
 
-    // Get max sort_order for this user
+    // Get max sort_order
     const { data: maxOrderData, error: orderError } = await supabase
       .from('user_funds')
       .select('sort_order')
@@ -368,33 +396,22 @@ export async function POST(request: Request) {
 
     const newSortOrder = maxOrderData ? (Number(maxOrderData.sort_order) || 0) + 1 : 0;
 
-    if (orderError && orderError.code !== 'PGRST116') {
-      console.error('Get max sort_order error:', orderError);
-      return NextResponse.json(
-        { error: 'Failed to determine sort order' },
-        { status: 500 }
-      );
-    }
-
-    // Insert into user_funds table (shares/cost now tracked via transactions only)
-    console.log('Inserting fund:', { fund_code, fund_name, sort_order: newSortOrder });
-    const { data: newFund, error: insertError } = await supabase
+    // Insert into user_funds
+    const { data: newPosition, error: insertError } = await supabase
       .from('user_funds')
       .insert({
         user_id: userId,
-        fund_code: fund_code.trim(),
-        fund_name: fund_name || null,
+        fund_code: code.trim(),
+        fund_name: name || null,
+        type,
         sort_order: newSortOrder,
       })
       .select()
       .single();
 
     if (insertError) {
-      console.error('Insert user fund error:', insertError);
-      return NextResponse.json(
-        { error: insertError.message },
-        { status: 500 }
-      );
+      console.error('Insert position error:', insertError);
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
     // If shares > 0, create initial buy transaction
@@ -403,8 +420,9 @@ export async function POST(request: Request) {
         .from('fund_transactions')
         .insert({
           user_id: userId,
-          fund_code: fund_code.trim(),
-          fund_name: fund_name || null,
+          fund_code: code.trim(),
+          fund_name: name || null,
+          type,
           transaction_type: 'buy',
           shares,
           price: cost,
@@ -413,15 +431,14 @@ export async function POST(request: Request) {
 
       if (txError) {
         console.error('Create initial transaction error:', txError);
-        // Fund was created, but transaction failed - still return success with warning
         return NextResponse.json(
-          { ...newFund, warning: 'Fund created but initial transaction failed' },
+          { ...newPosition, warning: 'Position created but initial transaction failed' },
           { status: 201 }
         );
       }
     }
 
-    return NextResponse.json(newFund, { status: 201 });
+    return NextResponse.json(newPosition, { status: 201 });
   } catch (error) {
     console.error('POST /api/user-funds error:', error);
     return NextResponse.json(

@@ -14,27 +14,40 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Delete transactions first (due to foreign key)
+    // First, get the position to find its code
+    const { data: position, error: positionError } = await supabase
+      .from('user_funds')
+      .select('fund_code, type')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (positionError || !position) {
+      return NextResponse.json({ error: 'Position not found' }, { status: 404 });
+    }
+
+    // Delete transactions first (use fund_code, not id)
     const { error: txError } = await supabase
       .from('fund_transactions')
       .delete()
-      .eq('fund_id', id);
+      .eq('fund_code', position.fund_code)
+      .eq('type', position.type || 'fund');
 
     if (txError) {
       console.error('Delete transactions error:', txError);
       return NextResponse.json({ error: txError.message }, { status: 500 });
     }
 
-    // Then delete the fund
-    const { error: fundError } = await supabase
+    // Then delete the position
+    const { error: deleteError } = await supabase
       .from('user_funds')
       .delete()
       .eq('id', id)
       .eq('user_id', user.id);
 
-    if (fundError) {
-      console.error('Delete fund error:', fundError);
-      return NextResponse.json({ error: fundError.message }, { status: 500 });
+    if (deleteError) {
+      console.error('Delete position error:', deleteError);
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

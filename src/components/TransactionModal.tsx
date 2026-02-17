@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/20/solid';
-import { UserFund } from '@/types';
+import { InvestmentType } from '@/types';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -14,16 +14,20 @@ interface TransactionModalProps {
     price: number;
     notes?: string;
   }) => void;
-  fund: Pick<UserFund, 'fund_code' | 'fund_name'>;
-  currentNav: number;
+  position: {
+    code: string;
+    name: string;
+    type: InvestmentType;
+  };
+  currentPrice: number;
 }
 
 export default function TransactionModal({
   isOpen,
   onClose,
   onSubmit,
-  fund,
-  currentNav,
+  position,
+  currentPrice,
 }: TransactionModalProps) {
   const [type, setType] = useState<'buy' | 'sell'>('buy');
   const [shares, setShares] = useState('');
@@ -56,6 +60,8 @@ export default function TransactionModal({
     setType('buy');
   };
 
+  const isStock = position.type === 'stock';
+
   return (
     <Dialog open={isOpen} onClose={handleClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/80" aria-hidden="true" />
@@ -75,11 +81,24 @@ export default function TransactionModal({
             </button>
           </div>
 
-          {/* Fund Info */}
+          {/* Position Info */}
           <div className="mb-6 p-3 rounded bg-[#0d0d15] border border-[#2a2a3a]">
-            <div className="text-sm text-gray-400">基金名称</div>
-            <div className="text-[#e0e0e0] font-medium">{fund.fund_name}</div>
-            <div className="text-xs text-gray-500 font-mono mt-1">{fund.fund_code}</div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs px-1.5 py-0.5 rounded ${
+                isStock
+                  ? 'bg-[#ff9500]/20 text-[#ff9500]'
+                  : 'bg-[#00ffff]/20 text-[#00ffff]'
+              }`}>
+                {isStock ? '股票' : '基金'}
+              </span>
+            </div>
+            <div className="text-[#e0e0e0] font-medium mt-2">{position.name}</div>
+            <div className="text-xs text-gray-500 font-mono mt-1">{position.code}</div>
+            {currentPrice > 0 && (
+              <div className="text-xs text-gray-400 mt-2">
+                当前{isStock ? '价格' : '净值'}: <span className="text-[#e0e0e0]">{currentPrice.toFixed(4)}</span>
+              </div>
+            )}
           </div>
 
           {/* Type Toggle */}
@@ -115,7 +134,7 @@ export default function TransactionModal({
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="shares" className="block text-sm font-medium text-gray-300 mb-1.5">
-                份额
+                {isStock ? '股数' : '份额'}
               </label>
               <input
                 type="number"
@@ -124,7 +143,7 @@ export default function TransactionModal({
                 min="0"
                 value={shares}
                 onChange={(e) => setShares(e.target.value)}
-                placeholder="请输入份额"
+                placeholder="请输入数量"
                 className="w-full px-3 py-2.5 rounded bg-[#0d0d15] border border-[#2a2a3a] text-[#e0e0e0] placeholder-gray-600 focus:outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff] transition-colors"
                 required
               />
@@ -132,7 +151,7 @@ export default function TransactionModal({
 
             <div>
               <label htmlFor="price" className="block text-sm font-medium text-gray-300 mb-1.5">
-                单价
+                {isStock ? '股价' : '单价'}
               </label>
               <input
                 type="number"
@@ -141,7 +160,7 @@ export default function TransactionModal({
                 min="0"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                placeholder={currentNav ? currentNav.toString() : '请输入单价'}
+                placeholder={currentPrice ? currentPrice.toString() : '请输入价格'}
                 className="w-full px-3 py-2.5 rounded bg-[#0d0d15] border border-[#2a2a3a] text-[#e0e0e0] placeholder-gray-600 focus:outline-none focus:border-[#00ffff] focus:ring-1 focus:ring-[#00ffff] transition-colors"
                 required
               />
