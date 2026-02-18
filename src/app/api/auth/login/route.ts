@@ -1,10 +1,11 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
-// POST /api/auth/login - User login
+// POST /api/auth/login - User login (单设备登录)
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
+    const adminSupabase = createAdminSupabaseClient();
     const body = await request.json();
     const { email, password } = body;
 
@@ -15,6 +16,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 先获取用户信息
+    const { data: userData } = await adminSupabase.auth.admin.listUsers();
+
+    // 查找匹配的用户
+    const user = userData.users.find(u => u.email === email);
+
+    // 如果用户已存在，先使所有会话失效（单设备登录）
+    if (user) {
+      await adminSupabase.auth.admin.signOut(user.id);
+    }
+
+    // 然后进行登录
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
