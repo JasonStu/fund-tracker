@@ -51,7 +51,7 @@ test.describe('持仓管理', () => {
     await deleteButton.click();
 
     // 确认删除 - 点击确认按钮而不是使用 dialog 事件
-    const confirmButton = page.locator('button:has-text("确定")');
+    const confirmButton = page.locator('button:has-text("删除")');
     await confirmButton.click();
 
     // 验证删除成功 - 等待持仓从列表中消失
