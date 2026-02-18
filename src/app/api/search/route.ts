@@ -68,7 +68,7 @@ async function searchFunds(query: string) {
           categoryDesc: item.CATEGORYDESC,
         };
       })
-      .filter(item => {
+      .filter((item): item is { code: string; name: string; type: 'stock' | 'fund'; category: string; categoryDesc: string } => {
         // 过滤掉指数
         return item.type !== 'index';
       });
