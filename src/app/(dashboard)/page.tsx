@@ -9,6 +9,7 @@ import numeral from 'numeral';
 import { useTranslations } from 'next-intl';
 import TransactionModal from '@/components/TransactionModal';
 import AddPositionModal from '@/components/AddPositionModal';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import TransactionHistoryModal from '@/components/TransactionHistoryModal';
 import { useApi } from '@/lib/hooks/useApi';
 import Link from 'next/link';
@@ -518,6 +519,20 @@ export default function Home() {
     }
   );
 
+  // 删除持仓的 API hook
+  const { loading: deletingPosition, execute: deletePosition } = useApi(
+    async (id: string) => {
+      return await apiClient.delete(`/user-funds/positions/${id}`);
+    },
+    {
+      onSuccess: () => {
+        fetchPositions();
+        setDeleteConfirmOpen(false);
+        setPendingDelete(null);
+      },
+    }
+  );
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -664,14 +679,7 @@ export default function Home() {
 
   const confirmDeletePosition = async () => {
     if (!pendingDelete) return;
-    try {
-      await apiClient.delete(`/user-funds/positions/${pendingDelete.id}`);
-      await fetchPositions();
-    } catch (e) {
-      console.error('Failed to remove position', e);
-    }
-    setDeleteConfirmOpen(false);
-    setPendingDelete(null);
+    await deletePosition(pendingDelete.id);
   };
 
   const funds = positions.filter(p => p.type === 'fund');
@@ -897,9 +905,11 @@ export default function Home() {
               </button>
               <button
                 onClick={confirmDeletePosition}
-                className="flex-1 px-4 py-2 bg-[#ff3333]/20 text-[#ff3333] border border-[#ff3333] hover:bg-[#ff3333]/30 transition-colors"
+                disabled={deletingPosition}
+                className="flex-1 px-4 py-2 bg-[#ff3333]/20 text-[#ff3333] border border-[#ff3333] hover:bg-[#ff3333]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               >
-                删除
+                {deletingPosition && <LoadingSpinner className="mr-2" />}
+                {deletingPosition ? '删除中...' : '删除'}
               </button>
             </div>
           </div>
