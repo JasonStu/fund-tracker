@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/20/solid';
 import { InvestmentType } from '@/types';
+import { LoadingSpinner } from './ui/LoadingSpinner';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ interface TransactionModalProps {
     type: InvestmentType;
   };
   currentPrice: number;
+  loading?: boolean;
 }
 
 export default function TransactionModal({
@@ -28,6 +30,7 @@ export default function TransactionModal({
   onSubmit,
   position,
   currentPrice,
+  loading = false,
 }: TransactionModalProps) {
   const [type, setType] = useState<'buy' | 'sell'>('buy');
   const [shares, setShares] = useState('');
@@ -191,13 +194,15 @@ export default function TransactionModal({
               </button>
               <button
                 type="submit"
-                className={`flex-1 px-4 py-2.5 text-sm font-medium rounded font-medium transition-colors ${
+                disabled={loading}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center ${
                   type === 'buy'
                     ? 'bg-[#33ff33] text-[#1a1a25] hover:bg-[#33ff33]/90'
                     : 'bg-[#ff3333] text-[#1a1a25] hover:bg-[#ff3333]/90'
                 }`}
               >
-                确认{type === 'buy' ? '买入' : '卖出'}
+                {loading && <LoadingSpinner className="mr-2 text-[#1a1a25]" />}
+                {loading ? '处理中...' : `确认${type === 'buy' ? '买入' : '卖出'}`}
               </button>
             </div>
           </form>

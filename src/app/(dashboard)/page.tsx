@@ -533,6 +533,20 @@ export default function Home() {
     }
   );
 
+  // 添加交易的 API hook
+  const { loading: addingTransaction, execute: addTransaction } = useApi(
+    async (data: { fund_id: string; type: string; shares: number; price: number; notes?: string }) => {
+      return await apiClient.post('/user-funds/transactions', data);
+    },
+    {
+      onSuccess: () => {
+        fetchPositions();
+        setTxModalOpen(false);
+        setSelectedPosition(null);
+      },
+    }
+  );
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -656,20 +670,13 @@ export default function Home() {
     notes?: string;
   }) => {
     if (!selectedPosition) return;
-    try {
-      await apiClient.post('/user-funds/transactions', {
-        fund_id: selectedPosition.id,
-        type: data.type,
-        shares: data.shares,
-        price: data.price,
-        notes: data.notes,
-      });
-      await fetchPositions();
-    } catch (e) {
-      console.error('Failed to submit transaction', e);
-    }
-    setTxModalOpen(false);
-    setSelectedPosition(null);
+    await addTransaction({
+      fund_id: selectedPosition.id,
+      type: data.type,
+      shares: data.shares,
+      price: data.price,
+      notes: data.notes,
+    });
   };
 
   const requestDeletePosition = (positionId: string, name: string) => {
@@ -866,6 +873,7 @@ export default function Home() {
           type: selectedPosition?.type || 'fund',
         }}
         currentPrice={selectedPosition?.nav || 0}
+        loading={addingTransaction}
       />
 
       <TransactionHistoryModal
