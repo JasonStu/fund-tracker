@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/20/solid';
 import { InvestmentType } from '@/types';
+import { LoadingSpinner } from './ui/LoadingSpinner';
 
 interface AddPositionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: { shares: number; cost: number }) => void;
   result: { code: string; name: string; type: InvestmentType } | null;
+  loading?: boolean;
 }
 
 export default function AddPositionModal({
@@ -17,6 +19,7 @@ export default function AddPositionModal({
   onClose,
   onSubmit,
   result,
+  loading = false,
 }: AddPositionModalProps) {
   const [shares, setShares] = useState('');
   const [cost, setCost] = useState('');
@@ -125,9 +128,11 @@ export default function AddPositionModal({
               </button>
               <button
                 type="submit"
-                className="flex-1 px-4 py-2.5 text-sm font-medium bg-[#00ffff] text-[#1a1a25] hover:bg-[#00ffff]/90 rounded font-medium transition-colors"
+                disabled={loading}
+                className="flex-1 px-4 py-2.5 text-sm font-medium bg-[#00ffff] text-[#1a1a25] hover:bg-[#00ffff]/90 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               >
-                添加
+                {loading && <LoadingSpinner className="mr-2 text-[#1a1a25]" />}
+                {loading ? '添加中...' : '添加'}
               </button>
             </div>
           </form>

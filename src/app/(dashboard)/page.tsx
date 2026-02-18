@@ -10,6 +10,7 @@ import { useTranslations } from 'next-intl';
 import TransactionModal from '@/components/TransactionModal';
 import AddPositionModal from '@/components/AddPositionModal';
 import TransactionHistoryModal from '@/components/TransactionHistoryModal';
+import { useApi } from '@/lib/hooks/useApi';
 import Link from 'next/link';
 import {
   DndContext,
@@ -503,6 +504,20 @@ export default function Home() {
   const [historyPosition, setHistoryPosition] = useState<{ code: string; name: string; type: InvestmentType } | null>(null);
   const [activeTab, setActiveTab] = useState<'fund' | 'stock'>('fund');
 
+  // 添加持仓的 API hook
+  const { loading: addingPosition, execute: addPosition } = useApi(
+    async (data: { type: string; code: string; name: string; shares: number; cost: number }) => {
+      return await apiClient.post('/user-funds', data);
+    },
+    {
+      onSuccess: () => {
+        fetchPositions();
+        setAddModalOpen(false);
+        setPendingResult(null);
+      },
+    }
+  );
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -591,20 +606,13 @@ export default function Home() {
 
   const handleAddPositionConfirm = async ({ shares, cost }: { shares: number; cost: number }) => {
     if (!pendingResult) return;
-    try {
-      await apiClient.post('/user-funds', {
-        type: pendingResult.type,
-        code: pendingResult.code,
-        name: pendingResult.name,
-        shares: shares || 0,
-        cost: cost || 0,
-      });
-      await fetchPositions();
-    } catch (e: unknown) {
-      console.error('Failed to add position', e instanceof Error ? e.message : 'Unknown error');
-    }
-    setAddModalOpen(false);
-    setPendingResult(null);
+    await addPosition({
+      type: pendingResult.type,
+      code: pendingResult.code,
+      name: pendingResult.name,
+      shares: shares || 0,
+      cost: cost || 0,
+    });
   };
 
   const handleAddPosition = (code: string, name: string, type: InvestmentType) => {
@@ -834,6 +842,7 @@ export default function Home() {
         }}
         onSubmit={handleAddPositionConfirm}
         result={pendingResult}
+        loading={addingPosition}
       />
 
       <TransactionModal
