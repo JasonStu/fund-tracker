@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { AuthProvider } from '@/components/AuthProvider';
 import Navbar from "@/components/Navbar";
+import { Toaster } from 'sonner';
 import "./globals.css";
 
 const geistSans = Geist({
@@ -39,6 +40,7 @@ export default async function RootLayout({
             <main className="max-w-5xl mx-auto px-4 py-8">
               {children}
             </main>
+            <Toaster position="top-center" richColors />
           </AuthProvider>
         </NextIntlClientProvider>
       </body>
