@@ -24,12 +24,12 @@ test.describe('持仓管理', () => {
     // 等待搜索结果
     await page.waitForSelector('text=160724', { timeout: 10000 });
 
-    // 填写份额
-    const sharesInput = page.locator('input[name="shares"]');
+    // 填写份额 - 使用正确的选择器
+    const sharesInput = page.locator('input#shares');
     await sharesInput.fill('1000');
 
-    // 提交
-    const submitButton = page.locator('button:has-text("确定")');
+    // 提交 - 使用正确的选择器
+    const submitButton = page.locator('button:has-text("添加")');
     await submitButton.click();
 
     // 验证添加成功
@@ -50,8 +50,11 @@ test.describe('持仓管理', () => {
     const deleteButton = page.locator('button:has-text("删除")').first();
     await deleteButton.click();
 
-    // 确认删除
-    page.on('dialog', dialog => dialog.accept());
-    await page.waitForTimeout(500);
+    // 确认删除 - 点击确认按钮而不是使用 dialog 事件
+    const confirmButton = page.locator('button:has-text("确定")');
+    await confirmButton.click();
+
+    // 验证删除成功 - 等待持仓从列表中消失
+    await expect(page.locator('text=160724')).not.toBeVisible();
   });
 });
