@@ -9,12 +9,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing code' }, { status: 400 });
   }
 
+  // 验证股票代码格式（6位数字）
+  if (!/^\d{6}$/.test(code)) {
+    return NextResponse.json({ error: 'Invalid code format' }, { status: 400 });
+  }
+
   // 转换市场代码
   let market = '';
   if (code.startsWith('6')) {
     market = '1'; // 上海
   } else if (code.startsWith('0') || code.startsWith('3')) {
     market = '0'; // 深圳
+  }
+
+  // 验证市场代码
+  if (!market) {
+    return NextResponse.json({ error: 'Invalid stock code' }, { status: 400 });
   }
 
   try {
@@ -32,18 +42,21 @@ export async function GET(request: NextRequest) {
     const data = response.data;
 
     if (data.data?.klines) {
-      const klines = data.data.klines.map((line: string) => {
-        const parts = line.split(',');
-        return {
-          date: parts[0],
-          open: parseFloat(parts[1]),
-          close: parseFloat(parts[2]),
-          high: parseFloat(parts[3]),
-          low: parseFloat(parts[4]),
-          volume: parseFloat(parts[5]),
-          amount: parseFloat(parts[6]),
-        };
-      });
+      const klines = data.data.klines
+        .map((line: string) => {
+          const parts = line.split(',');
+          if (parts.length < 7) return null;
+          return {
+            date: parts[0],
+            open: parseFloat(parts[1]),
+            close: parseFloat(parts[2]),
+            high: parseFloat(parts[3]),
+            low: parseFloat(parts[4]),
+            volume: parseFloat(parts[5]),
+            amount: parseFloat(parts[6]),
+          };
+        })
+        .filter((kline: unknown) => kline !== null);
 
       return NextResponse.json({ klines });
     }
