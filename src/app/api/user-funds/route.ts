@@ -302,9 +302,15 @@ export async function GET() {
       };
     });
 
+    const mappedTransactions = (transactions || []).map(tx => ({
+      ...tx,
+      code: tx.fund_code,
+      name: tx.fund_name
+    }));
+
     return NextResponse.json({
       positions: positionsWithValue,
-      transactions: transactions || [],
+      transactions: mappedTransactions,
     });
   } catch (error) {
     console.error('GET /api/user-funds error:', error);
