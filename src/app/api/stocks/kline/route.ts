@@ -4,6 +4,7 @@ import axios from 'axios';
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get('code');
+  const period = searchParams.get('period') || 'daily';
 
   if (!code) {
     return NextResponse.json({ error: 'Missing code' }, { status: 400 });
@@ -27,13 +28,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid stock code' }, { status: 400 });
   }
 
+  // K线周期映射
+  const periodMap: Record<string, number> = {
+    daily: 101,   // 日K
+    weekly: 102,  // 周K
+    monthly: 103, // 月K
+  };
+  const klt = periodMap[period] || 101;
+
   try {
     // 东方财富 K线 API
     const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?` +
       `secid=${market}.${code}&` +
       `fields1=f1,f2,f3,f4,f5,f6&` +
       `fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&` +
-      `klt=101&` + // 日K
+      `klt=${klt}&` +
       `fqt=1&` +
       `end=20500101&` +
       `lmt=500`;

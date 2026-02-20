@@ -158,5 +158,49 @@
       "deleteFailed": "Failed to delete invitation",
       "unknown": "An unknown error occurred"
     }
+  },
+  "StockDetail": {
+    "loading": "Loading...",
+    "error": "Failed to load data",
+    "backToPortfolio": "Back to Portfolio",
+    "currentPrice": "Current Price",
+    "change": "Change",
+    "changePercent": "Change %",
+    "lastUpdate": "Last Update",
+    "tabs": {
+      "overview": "Overview",
+      "chart": "Chart",
+      "transactions": "Transactions"
+    },
+    "overview": {
+      "shares": "Shares",
+      "avgCost": "Avg Cost",
+      "totalCost": "Total Cost",
+      "currentValue": "Current Value",
+      "totalPL": "Total P/L",
+      "plPercent": "P/L %"
+    },
+    "chart": {
+      "chartType": "Chart Type",
+      "intraday": "Intraday",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "maSelector": "MA Selector",
+      "addMA": "Add MA",
+      "maPlaceholder": "Enter period",
+      "indicators": "Indicators"
+    },
+    "transactions": {
+      "date": "Date",
+      "type": "Type",
+      "shares": "Shares",
+      "price": "Price",
+      "amount": "Amount",
+      "notes": "Notes",
+      "buy": "Buy",
+      "sell": "Sell",
+      "noTransactions": "No transactions yet"
+    }
   }
 }

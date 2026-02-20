@@ -158,5 +158,49 @@
       "deleteFailed": "删除邀请码失败",
       "unknown": "发生未知错误"
     }
+  },
+  "StockDetail": {
+    "loading": "加载中...",
+    "error": "获取数据失败",
+    "backToPortfolio": "返回自选",
+    "currentPrice": "现价",
+    "change": "涨跌额",
+    "changePercent": "涨跌幅",
+    "lastUpdate": "更新时间",
+    "tabs": {
+      "overview": "概览",
+      "chart": "图表",
+      "transactions": "交易记录"
+    },
+    "overview": {
+      "shares": "持有股数",
+      "avgCost": "成本价",
+      "totalCost": "总成本",
+      "currentValue": "当前市值",
+      "totalPL": "累计盈亏",
+      "plPercent": "收益率"
+    },
+    "chart": {
+      "chartType": "图表类型",
+      "intraday": "分时",
+      "daily": "日K",
+      "weekly": "周K",
+      "monthly": "月K",
+      "maSelector": "均线选择",
+      "addMA": "添加均线",
+      "maPlaceholder": "输入周期",
+      "indicators": "指标"
+    },
+    "transactions": {
+      "date": "日期",
+      "type": "类型",
+      "shares": "股数",
+      "price": "价格",
+      "amount": "金额",
+      "notes": "备注",
+      "buy": "买入",
+      "sell": "卖出",
+      "noTransactions": "暂无交易记录"
+    }
   }
 }
