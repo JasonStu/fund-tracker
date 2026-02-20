@@ -298,7 +298,7 @@ export async function GET() {
         total_sell: totalSell,
         currentValue,
         profit: totalProfit,
-        profitPercent: totalBuy > 0 ? (totalProfit / totalBuy) * 100 : 0,
+        profitPercent: (totalBuy - totalSell) > 0 ? (totalProfit / (totalBuy - totalSell)) * 100 : 0,
       };
     });
 

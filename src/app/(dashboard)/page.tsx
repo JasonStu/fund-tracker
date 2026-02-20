@@ -54,8 +54,8 @@ function PortfolioOverview({
   const stockValue = stocks.reduce((sum, p) => sum + (p.currentValue || 0), 0);
   const totalValue = fundValue + stockValue;
 
-  const fundCost = funds.reduce((sum, p) => sum + (p.total_buy || 0), 0);
-  const stockCost = stocks.reduce((sum, p) => sum + (p.total_buy || 0), 0);
+  const fundCost = funds.reduce((sum, p) => sum + ((p.total_buy || 0) - (p.total_sell || 0)), 0);
+  const stockCost = stocks.reduce((sum, p) => sum + ((p.total_buy || 0) - (p.total_sell || 0)), 0);
   const totalCost = fundCost + stockCost;
 
   const totalProfit = totalValue - totalCost;
@@ -221,7 +221,7 @@ function FundCard({
 
   const nav = position.estimatedNav || position.nav || 0;
   const currentValue = position.shares * nav;
-  const totalCost = position.total_buy;
+  const totalCost = position.total_buy - position.total_sell;
   const profit = currentValue - totalCost;
   const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
 
@@ -333,7 +333,7 @@ function StockCard({
 
   const currentPrice = position.estimatedNav || position.nav || 0;
   const currentValue = position.shares * currentPrice;
-  const totalCost = position.total_buy;
+  const totalCost = position.total_buy - position.total_sell;
   const profit = currentValue - totalCost;
   const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
 
