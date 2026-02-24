@@ -10,15 +10,15 @@ export async function DELETE(
 
     // Check authentication
     const {
-      data: { session },
+      data: { user },
       error: authError,
-    } = await supabase.auth.getSession();
+    } = await supabase.auth.getUser();
 
-    if (authError || !session) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
     const { id } = await params;
 
     // Delete the fund from user_funds table where id and user_id match

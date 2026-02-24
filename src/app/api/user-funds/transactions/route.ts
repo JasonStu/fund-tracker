@@ -143,15 +143,15 @@ export async function GET() {
     const supabase = await createServerSupabaseClient();
 
     const {
-      data: { session },
+      data: { user },
       error: authError,
-    } = await supabase.auth.getSession();
+    } = await supabase.auth.getUser();
 
-    if (authError || !session) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
 
     // Fetch all transactions for user
     const { data: transactions, error: transactionsError } = await supabase
