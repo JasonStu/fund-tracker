@@ -1,7 +1,7 @@
 -- supabase/migrations/003_create_stock_watchlist.sql
 
 -- 创建 stock_watchlist 表
-create table.stock_watchlist (
+create table public.stock_watchlist (
   id uuid default gen_random_uuid() primary key,
   type varchar(20) not null default '情报扫描' check (type in ('情报扫描', '金股', '盘中重点')),
   code varchar(20) not null,

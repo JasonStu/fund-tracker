@@ -122,6 +122,16 @@ export default function Navbar() {
               >
                 {t('editor')}
               </Link>
+              <Link
+                href="/watchlist"
+                className={`px-4 py-2 text-sm font-medium border border-transparent transition-all duration-200 ${
+                  pathname === '/watchlist'
+                    ? 'text-[#FFD700] border-[#FFD700] bg-[rgba(255,215,0,0.1)] shadow-[0_0_10px_rgba(255,215,0,0.3)]'
+                    : 'text-gray-400 hover:text-[#FFD700] hover:border-[#FFD700]/50'
+                }`}
+              >
+                自选股
+              </Link>
               {isAuthenticated && user?.role === 'admin' && (
                 <Link
                   href="/admin"
@@ -226,6 +236,12 @@ export default function Navbar() {
               <NavLink href="/editor" isActive={pathname === '/editor'}>
                 {navItems[1].icon}
                 {t('editor')}
+              </NavLink>
+              <NavLink href="/watchlist" isActive={pathname === '/watchlist'}>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+                自选股
               </NavLink>
               {isAuthenticated && user?.role === 'admin' && (
                 <NavLink href="/admin" isActive={pathname === '/admin'}>
