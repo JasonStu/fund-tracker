@@ -22,6 +22,8 @@ export default function EditorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [stockType, setStockType] = useState<'情报扫描' | '金股' | '盘中重点'>('情报扫描');
+  const [submitTarget, setSubmitTarget] = useState<'feishu' | 'both'>('both');
 
   const handleParse = () => {
     setError(null);
@@ -52,6 +54,30 @@ export default function EditorPage() {
     setSuccess(null);
 
     try {
+      // 如果需要写入自选股
+      if (submitTarget === 'both') {
+        const watchlistRes = await fetch('/api/watchlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: stockType,
+            code: parsedStock.code,
+            name: parsedStock.name,
+            sector: parsedStock.sector,
+            price_range: parsedStock.priceRange,
+            strategy: parsedStock.strategy,
+            first_profit_price: parseFloat(parsedStock.pressure) || null,
+            stop_loss_price: parseFloat(parsedStock.support) || null,
+            position_pct: parsedStock.position,
+            highlights: parsedStock.highlights,
+          }),
+        });
+
+        if (!watchlistRes.ok) {
+          throw new Error('Failed to add to watchlist');
+        }
+      }
+
       const response = await fetch('/api/feishu/bitable', {
         method: 'POST',
         headers: {
@@ -120,6 +146,27 @@ export default function EditorPage() {
               >
                 {t('loadSample')}
               </button>
+            </div>
+
+            <div className="flex gap-2 mb-3">
+              <select
+                value={stockType}
+                onChange={(e) => setStockType(e.target.value as '情报扫描' | '金股' | '盘中重点')}
+                className="bg-[#12121a] border border-[#2a2a3a] text-gray-200 px-3 py-2 rounded"
+              >
+                <option value="情报扫描">情报扫描</option>
+                <option value="金股">金股</option>
+                <option value="盘中重点">盘中重点</option>
+              </select>
+
+              <select
+                value={submitTarget}
+                onChange={(e) => setSubmitTarget(e.target.value as 'feishu' | 'both')}
+                className="bg-[#12121a] border border-[#2a2a3a] text-gray-200 px-3 py-2 rounded"
+              >
+                <option value="both">同时写入自选股 + 飞书</option>
+                <option value="feishu">仅飞书</option>
+              </select>
             </div>
 
             <textarea
