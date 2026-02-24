@@ -7,7 +7,14 @@ export async function getStockPrice(code: string): Promise<number | null> {
     const secId = getSecId(code);
     const response = await fetch(
       `https://push2.eastmoney.com/api/qt/stock/get?secid=${secId}&fields=f43,f44,f45,f46,f47,f48,f49,f50,f51,f52,f57,f58,f59,f60,f169,f170,f171`,
-      { signal: controller.signal }
+      {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://quote.eastmoney.com/',
+          'Accept': '*/*',
+        },
+      }
     );
     clearTimeout(timeoutId);
 
