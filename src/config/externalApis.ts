@@ -28,7 +28,7 @@ export const externalApis = {
   },
   feishu: {
     baseUrl: 'https://open.feishu.cn/open-apis',
-    timeout: 15000,
+    timeout: 30000,
   },
 } as const;
 
