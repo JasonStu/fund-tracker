@@ -125,9 +125,9 @@ export default function EditorPage() {
         {/* Config Status */}
         <div className="mb-4 sm:mb-6 p-3 sm:p-4 rounded-lg border border-[#2a2a3a] bg-[#12121a]">
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${process.env.NEXT_PUBLIC_FEISHU_CONFIGURED === 'true' ? 'bg-green-500' : 'bg-yellow-500'}`} />
+            <div className={`w-2 h-2 rounded-full ${process.env.FEISHU_APP_ID ? 'bg-green-500' : 'bg-yellow-500'}`} />
             <span className="text-xs sm:text-sm text-gray-400">
-              {process.env.NEXT_PUBLIC_FEISHU_CONFIGURED === 'true'
+              {process.env.FEISHU_APP_ID
                 ? t('config.configured')
                 : t('config.notConfigured')}
             </span>
