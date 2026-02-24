@@ -69,12 +69,15 @@ export default function WatchlistPage() {
         list.map(async (item) => {
           try {
             const price = await getStockPrice(item.code);
-            const priceDiff = item.registered_price
-              ? ((price - item.registered_price) / item.registered_price) * 100
-              : 0;
-            return { ...item, current_price: price, price_diff: priceDiff };
+            // 只有获取到有效价格时才更新
+            if (price !== null && item.registered_price) {
+              const priceDiff = ((price - item.registered_price) / item.registered_price) * 100;
+              return { ...item, current_price: price, price_diff: priceDiff };
+            }
+            // 如果价格获取失败，保持原值
+            return item;
           } catch {
-            return { ...item, current_price: 0, price_diff: 0 };
+            return item;
           }
         })
       );
