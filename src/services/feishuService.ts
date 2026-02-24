@@ -229,6 +229,7 @@ export class FeishuService {
 
   /**
    * Ensure all required fields exist in the table
+   * With timeout and simplified logic to prevent hangs
    */
   async ensureFields(appToken: string, tableId: string): Promise<void> {
     const requiredFields = [
@@ -245,27 +246,45 @@ export class FeishuService {
 
     console.log('[Feishu] Ensuring fields exist in table:', tableId);
 
-    // Get existing fields
-    const existingFields = await this.getTableFields(appToken, tableId);
-    console.log('[Feishu] Existing fields:', Object.keys(existingFields));
+    try {
+      // Add timeout wrapper for getTableFields
+      const timeoutMs = 10000; // 10 second timeout
+      const getFieldsWithTimeout = async () => {
+        return Promise.race([
+          this.getTableFields(appToken, tableId),
+          new Promise<Record<string, string>>((_, reject) =>
+            setTimeout(() => reject(new Error('getTableFields timeout')), timeoutMs)
+          )
+        ]);
+      };
 
-    // Remove unnecessary fields that might interfere
-    const fieldsToRemove = ['文本', '单选', '日期', '附件'];
-    for (const fieldName of fieldsToRemove) {
-      if (existingFields[fieldName]) {
-        console.log('[Feishu] Removing unnecessary field:', fieldName);
-        // Note: Can't delete fields via API, just skip them
-      }
-    }
+      // Get existing fields with timeout
+      const existingFields = await getFieldsWithTimeout();
+      console.log('[Feishu] Existing fields:', Object.keys(existingFields));
 
-    // Only create missing fields
-    for (const field of requiredFields) {
-      if (existingFields[field.name]) {
-        console.log('[Feishu] Field already exists:', field.name);
-      } else {
-        console.log('[Feishu] Creating missing field:', field.name);
-        await this.createField(appToken, tableId, field.name, field.type);
+      // Only create missing fields (simplified - skip field removal logic)
+      for (const field of requiredFields) {
+        if (existingFields[field.name]) {
+          console.log('[Feishu] Field already exists:', field.name);
+        } else {
+          console.log('[Feishu] Creating missing field:', field.name);
+          try {
+            await Promise.race([
+              this.createField(appToken, tableId, field.name, field.type),
+              new Promise<null>((_, reject) =>
+                setTimeout(() => reject(new Error('createField timeout')), timeoutMs)
+              )
+            ]);
+          } catch (fieldError) {
+            console.error('[Feishu] Failed to create field:', field.name, fieldError);
+            // Continue with other fields even if one fails
+          }
+        }
       }
+    } catch (error) {
+      console.error('[Feishu] ensureFields error:', error);
+      // Don't throw - allow insertion to proceed even if field check fails
+      console.log('[Feishu] Proceeding with insertion despite field check error');
     }
   }
 
