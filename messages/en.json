@@ -202,5 +202,10 @@
       "sell": "Sell",
       "noTransactions": "No transactions yet"
     }
+  },
+  "Watchlist": {
+    "title": "Stock Watchlist",
+    "empty": "No data",
+    "confirmDelete": "Are you sure you want to delete?"
   }
 }

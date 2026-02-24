@@ -202,5 +202,10 @@
       "sell": "卖出",
       "noTransactions": "暂无交易记录"
     }
+  },
+  "Watchlist": {
+    "title": "自选股关注列表",
+    "empty": "暂无数据",
+    "confirmDelete": "确定要删除吗？"
   }
 }
