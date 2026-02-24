@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import numeral from 'numeral';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import AddPositionModal from '@/components/AddPositionModal';
+import EditWatchlistModal from '@/components/EditWatchlistModal';
 import { InvestmentType } from '@/types';
 import { getStockPrice } from '@/utils/stockApi';
 
@@ -41,6 +42,8 @@ export default function WatchlistPage() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectedStock, setSelectedStock] = useState<{ code: string; name: string } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<WatchlistItem | null>(null);
 
   const fetchList = async () => {
     try {
@@ -97,6 +100,11 @@ export default function WatchlistPage() {
   const handleAddToPortfolio = (item: WatchlistItem) => {
     setSelectedStock({ code: item.code, name: item.name });
     setAddModalOpen(true);
+  };
+
+  const handleEdit = (item: WatchlistItem) => {
+    setEditingItem(item);
+    setEditModalOpen(true);
   };
 
   return (
@@ -188,6 +196,12 @@ export default function WatchlistPage() {
                     {/* Right: Actions */}
                     <div className="flex items-center gap-2 shrink-0">
                       <button
+                        onClick={() => handleEdit(item)}
+                        className="px-3 py-1.5 text-xs bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] hover:bg-[#FFD700]/20 hover:border-[#FFD700]/50 rounded transition-colors"
+                      >
+                        编辑
+                      </button>
+                      <button
                         onClick={() => handleAddToPortfolio(item)}
                         className="px-3 py-1.5 text-xs bg-[#00ffff]/10 border border-[#00ffff]/30 text-[#00ffff] hover:bg-[#00ffff]/20 hover:border-[#00ffff]/50 rounded transition-colors"
                       >
@@ -270,6 +284,16 @@ export default function WatchlistPage() {
         }}
         result={selectedStock ? { code: selectedStock.code, name: selectedStock.name, type: 'stock' as InvestmentType } : null}
         loading={false}
+      />
+
+      <EditWatchlistModal
+        isOpen={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false);
+          setEditingItem(null);
+        }}
+        onSuccess={() => fetchList()}
+        item={editingItem}
       />
     </div>
   );
