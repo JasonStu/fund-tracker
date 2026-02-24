@@ -270,10 +270,16 @@ function FundCard({
             <div className="text-xs text-gray-500">持仓市值</div>
             <div className="text-sm text-[#00ffff]">{numeral(currentValue).format('0,0.00')}</div>
           </div>
-          <div className="col-span-2">
+          <div>
             <div className="text-xs text-gray-500">收益率</div>
             <div className={`text-lg font-semibold ${profitPercent >= 0 ? 'text-[#00ffff]' : 'text-[#ff3333]'}`}>
               {profitPercent >= 0 ? '+' : ''}{numeral(profitPercent).format('0.00')}%
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500">估算涨幅</div>
+            <div className={`text-lg font-semibold ${position.estimatedChangePercent >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'}`}>
+              {position.estimatedChangePercent >= 0 ? '+' : ''}{numeral(position.estimatedChangePercent).format('0.00')}%
             </div>
           </div>
         </div>
