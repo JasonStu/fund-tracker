@@ -298,13 +298,19 @@ export async function GET() {
         total_sell: totalSell,
         currentValue,
         profit: totalProfit,
-        profitPercent: totalBuy > 0 ? (totalProfit / totalBuy) * 100 : 0,
+        profitPercent: (totalBuy - totalSell) > 0 ? (totalProfit / (totalBuy - totalSell)) * 100 : 0,
       };
     });
 
+    const mappedTransactions = (transactions || []).map(tx => ({
+      ...tx,
+      code: tx.fund_code,
+      name: tx.fund_name
+    }));
+
     return NextResponse.json({
       positions: positionsWithValue,
-      transactions: transactions || [],
+      transactions: mappedTransactions,
     });
   } catch (error) {
     console.error('GET /api/user-funds error:', error);
