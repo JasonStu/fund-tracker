@@ -44,6 +44,8 @@ export default function WatchlistPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WatchlistItem | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const fetchList = async () => {
     try {
@@ -65,7 +67,8 @@ export default function WatchlistPage() {
     if (list.length === 0) return;
 
     const fetchPrices = async () => {
-      const updatedList = await Promise.all(
+      // 使用 Promise.allSettled 确保即使某个股票获取失败也不影响其他股票
+      const results = await Promise.allSettled(
         list.map(async (item) => {
           try {
             const price = await getStockPrice(item.code);
@@ -76,11 +79,18 @@ export default function WatchlistPage() {
             }
             // 如果价格获取失败，保持原值
             return item;
-          } catch {
+          } catch (error) {
+            console.error(`Fetch price failed for ${item.code}:`, error);
             return item;
           }
         })
       );
+
+      // 提取成功的结果
+      const updatedList = results
+        .filter((result): result is PromiseFulfilledResult<WatchlistItem> => result.status === 'fulfilled')
+        .map(result => result.value);
+
       setList(updatedList);
     };
 
@@ -90,13 +100,21 @@ export default function WatchlistPage() {
     return () => clearInterval(interval);
   }, [list.length]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除吗？')) return;
+  const handleDelete = (id: string, name: string) => {
+    setPendingDelete({ id, name });
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeletePosition = async () => {
+    if (!pendingDelete) return;
     try {
-      await apiClient.delete(`/watchlist/${id}`);
+      await apiClient.delete(`/watchlist/${pendingDelete.id}`);
       fetchList();
     } catch (e) {
       console.error('Failed to delete', e);
+    } finally {
+      setDeleteConfirmOpen(false);
+      setPendingDelete(null);
     }
   };
 
@@ -211,7 +229,7 @@ export default function WatchlistPage() {
                         关注
                       </button>
                       <button
-                        onClick={() => handleDelete(item.id)}
+                        onClick={() => handleDelete(item.id, item.name)}
                         className="px-3 py-1.5 text-xs bg-[#ff3333]/10 border border-[#ff3333]/30 text-[#ff3333] hover:bg-[#ff3333]/20 hover:border-[#ff3333]/50 rounded transition-colors"
                       >
                         删除
@@ -298,6 +316,42 @@ export default function WatchlistPage() {
         onSuccess={() => fetchList()}
         item={editingItem}
       />
+
+      {/* 删除确认对话框 */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gradient-to-br from-[#1a1a25] to-[#12121a] border border-[#2a2a3a] rounded-none p-6 max-w-sm w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-[#ff3333]/10 rounded flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#ff3333]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-[#e0e0e0]">确认删除</h3>
+            </div>
+            <p className="text-gray-400 mb-6">
+              确定要删除 <span className="text-[#e0e0e0] font-medium">{pendingDelete?.name}</span> 吗？此操作不可恢复。
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setDeleteConfirmOpen(false);
+                  setPendingDelete(null);
+                }}
+                className="flex-1 px-4 py-2 bg-[#2a2a3a] text-[#e0e0e0] hover:bg-[#3a3a4a] transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmDeletePosition}
+                className="flex-1 px-4 py-2 bg-[#ff3333]/20 text-[#ff3333] border border-[#ff3333] hover:bg-[#ff3333]/30 transition-colors flex items-center justify-center"
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
