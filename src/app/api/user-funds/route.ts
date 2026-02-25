@@ -34,8 +34,22 @@ async function getFundRealtimeValuation(fundCode: string) {
   };
 }
 
+// 东方财富API速率限制
+let stockRequestCount = 0;
+let stockLastRequestTime = 0;
+const STOCK_MIN_REQUEST_INTERVAL = 3000; // 每次请求间隔3秒
+
 // Helper to fetch stock realtime price from EastMoney
 async function getStockRealtimePrice(stockCode: string) {
+  // 速率限制
+  const now = Date.now();
+  const timeSinceLastRequest = now - stockLastRequestTime;
+  if (timeSinceLastRequest < STOCK_MIN_REQUEST_INTERVAL) {
+    await new Promise(resolve => setTimeout(resolve, STOCK_MIN_REQUEST_INTERVAL - timeSinceLastRequest));
+  }
+  stockLastRequestTime = Date.now();
+  stockRequestCount++;
+
   try {
     // Convert to market code format
     let market = '';
@@ -51,7 +65,14 @@ async function getStockRealtimePrice(stockCode: string) {
       `invt=2&` +
       `secid=${market}.${stockCode}`;
 
-    const response = await axios.get(url, { timeout: 5000 });
+    const response = await axios.get(url, { timeout: 10000 });
+
+    // 处理500错误
+    if (response.status === 500 || response.status === 502 || response.status === 503) {
+      console.warn(`东方财富API返回${response.status}，可能被限流`);
+      return null;
+    }
+
     const data = response.data;
 
     if (data && data.data) {
@@ -59,6 +80,13 @@ async function getStockRealtimePrice(stockCode: string) {
       const f86 = parseFloat(data.data.f86) || 0; // Volume
       const f169 = parseFloat(data.data.f169) || 0; // 涨跌额 (change amount in 分)
       const f170 = parseFloat(data.data.f170) || 0; // 涨跌幅% (change percent)
+
+      // 检查是否返回有效数据
+      if (f43 === 0) {
+        console.warn(`股票 ${stockCode} 价格数据无效`);
+        return null;
+      }
+
       return {
         currentPrice: f43 / 100, // 转换为元
         previousClose: (f43 - f169) / 100, // 从当前价和涨跌额计算昨收价
@@ -70,13 +98,7 @@ async function getStockRealtimePrice(stockCode: string) {
   } catch (error) {
     console.error(`Fetch stock ${stockCode} price failed:`, error);
   }
-  return {
-    currentPrice: 0,
-    previousClose: 0,
-    change: 0,
-    changePercent: 0,
-    volume: 0,
-  };
+  return null;
 }
 
 export async function GET() {
@@ -271,24 +293,24 @@ export async function GET() {
 
       const realizedProfit = totalSell - realizedCost;
       const estimatedNav = position.type === 'stock'
-        ? (valuation as any).currentPrice || 0
-        : (valuation as any).estimatedNav || 0;
+        ? (valuation as any)?.currentPrice || 0
+        : (valuation as any)?.estimatedNav || 0;
       const unrealizedProfit = (currentShares * estimatedNav) - remainingCost;
       const totalProfit = realizedProfit + unrealizedProfit;
 
       const currentValue = currentShares * estimatedNav;
       const estimatedChange = position.type === 'stock'
-        ? (valuation as any).change || 0
-        : (valuation as any).estimatedChange || 0;
+        ? (valuation as any)?.change || 0
+        : (valuation as any)?.estimatedChange || 0;
       const estimatedChangePercent = position.type === 'stock'
-        ? (valuation as any).changePercent || 0
-        : (valuation as any).estimatedChangePercent || 0;
+        ? (valuation as any)?.changePercent || 0
+        : (valuation as any)?.estimatedChangePercent || 0;
 
       return {
         ...position,
         nav: position.type === 'stock'
-          ? (valuation as any).previousClose || 0
-          : (valuation as any).nav || 0,
+          ? (valuation as any)?.previousClose || 0
+          : (valuation as any)?.nav || 0,
         estimatedNav,
         estimatedChange,
         estimatedChangePercent,
