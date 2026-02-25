@@ -1,7 +1,7 @@
 // src/app/(dashboard)/watchlist/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiClient } from '@/lib/api/client';
 import { useTranslations } from 'next-intl';
 import numeral from 'numeral';
@@ -47,7 +47,6 @@ export default function WatchlistPage() {
   const [editingItem, setEditingItem] = useState<WatchlistItem | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
-  const [priceCache, setPriceCache] = useState<Map<string, { price: number; timestamp: number }>>(new Map());
   const [refreshingStocks, setRefreshingStocks] = useState<Set<string>>(new Set());
 
   const fetchList = async () => {
@@ -64,6 +63,9 @@ export default function WatchlistPage() {
   useEffect(() => {
     fetchList();
   }, []);
+
+  // 使用 ref 存储 priceCache，避免触发 useEffect 重新执行
+  const priceCacheRef = useRef<Map<string, { price: number; timestamp: number }>>(new Map());
 
   // 获取实时股价和计算价差（带缓存逻辑）
   useEffect(() => {
@@ -82,12 +84,12 @@ export default function WatchlistPage() {
             // 只有获取到有效价格时才更新
             if (price !== null && item!.registered_price) {
               const priceDiff = ((price - item!.registered_price) / item!.registered_price) * 100;
-              // 更新缓存
-              setPriceCache(prev => new Map(prev).set(item!.code, { price, timestamp: Date.now() }));
+              // 更新缓存（使用 ref 避免触发 useEffect）
+              priceCacheRef.current.set(item!.code, { price, timestamp: Date.now() });
               return { ...item!, current_price: price, price_diff: priceDiff, isStale: false };
             }
             // 如果价格获取失败，检查缓存
-            const cached = priceCache.get(item!.code);
+            const cached = priceCacheRef.current.get(item!.code);
             if (cached && item!.registered_price) {
               const priceDiff = ((cached.price - item!.registered_price) / item!.registered_price) * 100;
               return { ...item!, current_price: cached.price, price_diff: priceDiff, isStale: true };
@@ -97,7 +99,7 @@ export default function WatchlistPage() {
           } catch (error) {
             console.error(`Fetch price failed for ${item!.code}:`, error);
             // 检查缓存
-            const cached = priceCache.get(item!.code);
+            const cached = priceCacheRef.current.get(item!.code);
             if (cached && item!.registered_price) {
               const priceDiff = ((cached.price - item!.registered_price) / item!.registered_price) * 100;
               return { ...item!, current_price: cached.price, price_diff: priceDiff, isStale: true };
@@ -132,7 +134,7 @@ export default function WatchlistPage() {
     const interval = setInterval(fetchPrices, 60000); // 每60秒刷新
 
     return () => clearInterval(interval);
-  }, [list.length, priceCache]);
+  }, [list]);
 
   const handleDelete = (id: string, name: string) => {
     setPendingDelete({ id, name });
