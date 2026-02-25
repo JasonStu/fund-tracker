@@ -219,7 +219,7 @@ function FundCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const nav = position.estimatedNav || position.nav || 0;
+  const nav = position.nav || position.estimatedNav || 0;
   const currentValue = position.shares * nav;
   const totalCost = position.total_buy - position.total_sell;
   const profit = currentValue - totalCost;
@@ -337,7 +337,7 @@ function StockCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const currentPrice = position.estimatedNav || position.nav || 0;
+  const currentPrice = position.nav || position.estimatedNav || 0;
   const currentValue = position.shares * currentPrice;
   const totalCost = position.total_buy - position.total_sell;
   const profit = currentValue - totalCost;
@@ -658,7 +658,7 @@ export default function Home() {
         code,
         name,
         type,
-        nav: position.estimatedNav || position.nav || 0,
+        nav: position.nav || position.estimatedNav || 0,
       });
       setTxModalOpen(true);
     }
