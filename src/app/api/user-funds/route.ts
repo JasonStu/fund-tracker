@@ -55,14 +55,14 @@ async function getStockRealtimePrice(stockCode: string) {
     const data = response.data;
 
     if (data && data.data) {
-      const f43 = parseFloat(data.data.f43) || 0; // Current price
+      const f43 = parseFloat(data.data.f43) || 0; // Current price in 分
       const f86 = parseFloat(data.data.f86) || 0; // Volume
-      const f169 = parseFloat(data.data.f169) || 0; // 涨跌额 (change amount)
+      const f169 = parseFloat(data.data.f169) || 0; // 涨跌额 (change amount in 分)
       const f170 = parseFloat(data.data.f170) || 0; // 涨跌幅% (change percent)
       return {
-        currentPrice: f43,
-        previousClose: f43 - f169, // 从当前价和涨跌额计算昨收价
-        change: f169,
+        currentPrice: f43 / 100, // 转换为元
+        previousClose: (f43 - f169) / 100, // 从当前价和涨跌额计算昨收价
+        change: f169 / 100, // 转换为元
         changePercent: f170,
         volume: f86,
       };
