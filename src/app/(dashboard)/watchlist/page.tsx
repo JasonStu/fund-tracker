@@ -27,6 +27,7 @@ interface WatchlistItem {
   registered_price: number;
   current_price?: number;
   price_diff?: number;
+  isStale?: boolean;
 }
 
 const TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -46,6 +47,8 @@ export default function WatchlistPage() {
   const [editingItem, setEditingItem] = useState<WatchlistItem | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [priceCache, setPriceCache] = useState<Map<string, { price: number; timestamp: number }>>(new Map());
+  const [refreshingStocks, setRefreshingStocks] = useState<Set<string>>(new Set());
 
   const fetchList = async () => {
     try {
@@ -62,26 +65,44 @@ export default function WatchlistPage() {
     fetchList();
   }, []);
 
-  // 获取实时股价和计算价差
+  // 获取实时股价和计算价差（带缓存逻辑）
   useEffect(() => {
     if (list.length === 0) return;
 
-    const fetchPrices = async () => {
+    const fetchPrices = async (stockCode?: string) => {
+      const stocksToFetch = stockCode
+        ? [list.find(item => item.code === stockCode)].filter(Boolean)
+        : list;
+
       // 使用 Promise.allSettled 确保即使某个股票获取失败也不影响其他股票
       const results = await Promise.allSettled(
-        list.map(async (item) => {
+        stocksToFetch.map(async (item) => {
           try {
-            const price = await getStockPrice(item.code);
+            const price = await getStockPrice(item!.code);
             // 只有获取到有效价格时才更新
-            if (price !== null && item.registered_price) {
-              const priceDiff = ((price - item.registered_price) / item.registered_price) * 100;
-              return { ...item, current_price: price, price_diff: priceDiff };
+            if (price !== null && item!.registered_price) {
+              const priceDiff = ((price - item!.registered_price) / item!.registered_price) * 100;
+              // 更新缓存
+              setPriceCache(prev => new Map(prev).set(item!.code, { price, timestamp: Date.now() }));
+              return { ...item!, current_price: price, price_diff: priceDiff, isStale: false };
             }
-            // 如果价格获取失败，保持原值
-            return item;
+            // 如果价格获取失败，检查缓存
+            const cached = priceCache.get(item!.code);
+            if (cached && item!.registered_price) {
+              const priceDiff = ((cached.price - item!.registered_price) / item!.registered_price) * 100;
+              return { ...item!, current_price: cached.price, price_diff: priceDiff, isStale: true };
+            }
+            // 无缓存，保持原值
+            return { ...item!, isStale: true };
           } catch (error) {
-            console.error(`Fetch price failed for ${item.code}:`, error);
-            return item;
+            console.error(`Fetch price failed for ${item!.code}:`, error);
+            // 检查缓存
+            const cached = priceCache.get(item!.code);
+            if (cached && item!.registered_price) {
+              const priceDiff = ((cached.price - item!.registered_price) / item!.registered_price) * 100;
+              return { ...item!, current_price: cached.price, price_diff: priceDiff, isStale: true };
+            }
+            return { ...item!, isStale: true };
           }
         })
       );
@@ -91,14 +112,27 @@ export default function WatchlistPage() {
         .filter((result): result is PromiseFulfilledResult<WatchlistItem> => result.status === 'fulfilled')
         .map(result => result.value);
 
-      setList(updatedList);
+      if (stockCode) {
+        // 单个刷新，更新对应项
+        setList(prev => prev.map(item => {
+          const updated = updatedList.find(u => u.code === item.code);
+          return updated || item;
+        }));
+        setRefreshingStocks(prev => {
+          const next = new Set(prev);
+          next.delete(stockCode);
+          return next;
+        });
+      } else {
+        setList(updatedList);
+      }
     };
 
     fetchPrices();
     const interval = setInterval(fetchPrices, 60000); // 每60秒刷新
 
     return () => clearInterval(interval);
-  }, [list.length]);
+  }, [list.length, priceCache]);
 
   const handleDelete = (id: string, name: string) => {
     setPendingDelete({ id, name });
@@ -178,9 +212,10 @@ export default function WatchlistPage() {
                 key={item.id}
                 className="bg-gradient-to-br from-[#0d0d15] to-[#12121a] border border-[#2a2a3a] hover:border-[#FFD700]/30 transition-all duration-300 overflow-hidden"
               >
-                {/* Main Row */}
+                {/* Main Row - Responsive */}
                 <div className="p-4">
-                  <div className="flex items-center justify-between gap-4">
+                  {/* 桌面端：水平布局 */}
+                  <div className="hidden md:flex items-center justify-between gap-4">
                     {/* Left: Type + Stock */}
                     <div className="flex items-center gap-3 min-w-0">
                       <span className={`px-2.5 py-1 rounded text-xs font-medium border ${TYPE_COLORS[item.type]?.bg} ${TYPE_COLORS[item.type]?.text} ${TYPE_COLORS[item.type]?.border}`}>
@@ -200,8 +235,26 @@ export default function WatchlistPage() {
                       </div>
                       <div>
                         <div className="text-xs text-gray-500">当前股价</div>
-                        <div className="text-[#FFD700] font-mono font-medium">
-                          {item.current_price ? numeral(item.current_price).format('0.00') : '-'}
+                        <div className="flex items-center justify-center gap-1">
+                          <div className="text-[#FFD700] font-mono font-medium">
+                            {item.current_price ? numeral(item.current_price).format('0.00') : '-'}
+                          </div>
+                          {item.isStale && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRefreshingStocks(prev => new Set(prev).add(item.code));
+                                fetchPrices(item.code);
+                              }}
+                              disabled={refreshingStocks.has(item.code)}
+                              className="p-1 text-gray-500 hover:text-[#FFD700] transition-colors"
+                              title="刷新价格"
+                            >
+                              <svg className={`w-3 h-3 ${refreshingStocks.has(item.code) ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                       </div>
                       <div>
@@ -243,31 +296,145 @@ export default function WatchlistPage() {
                     </div>
                   </div>
 
-                  {/* Secondary Info */}
-                  <div className="mt-3 pt-3 border-t border-[#2a2a3a] flex flex-wrap gap-x-6 gap-y-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">板块：</span>
-                      <span className="text-gray-400">{item.sector || '-'}</span>
+                  {/* 移动端：垂直布局 */}
+                  <div className="md:hidden flex flex-col gap-3">
+                    {/* 第一行：股票信息 + 价格 */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium border ${TYPE_COLORS[item.type]?.bg} ${TYPE_COLORS[item.type]?.text} ${TYPE_COLORS[item.type]?.border}`}>
+                          {item.type}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-[#e0e0e0] font-medium text-sm truncate">{item.name}</div>
+                          <div className="text-xs text-gray-500">{item.code}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="flex items-center gap-1 justify-end">
+                          <span className="text-[#FFD700] font-mono font-medium text-sm">
+                            {item.current_price ? numeral(item.current_price).format('0.00') : '-'}
+                          </span>
+                          {item.isStale && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRefreshingStocks(prev => new Set(prev).add(item.code));
+                                fetchPrices(item.code);
+                              }}
+                              disabled={refreshingStocks.has(item.code)}
+                              className="p-1 text-gray-500 hover:text-[#FFD700] transition-colors"
+                            >
+                              <svg className={`w-3 h-3 ${refreshingStocks.has(item.code) ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                        <div className={`text-xs font-mono ${
+                          (item.price_diff || 0) >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'
+                        }`}>
+                          {item.price_diff ? (item.price_diff >= 0 ? '+' : '') + numeral(item.price_diff).format('0.00') + '%' : '-'}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-gray-500">策略：</span>
-                      <span className="text-gray-400">{item.strategy || '-'}</span>
+
+                    {/* 第二行：指标网格 */}
+                    <div className="grid grid-cols-3 gap-2 text-center bg-[#1a1a25] rounded p-2">
+                      <div>
+                        <div className="text-xs text-gray-500">登记价</div>
+                        <div className="text-gray-300 font-mono text-sm">{numeral(item.registered_price).format('0.00')}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500">当前价</div>
+                        <div className="text-[#FFD700] font-mono text-sm">{item.current_price ? numeral(item.current_price).format('0.00') : '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500">价差</div>
+                        <div className={`font-mono text-sm ${(item.price_diff || 0) >= 0 ? 'text-[#ff3333]' : 'text-[#33ff33]'}`}>
+                          {item.price_diff ? (item.price_diff >= 0 ? '+' : '') + numeral(item.price_diff).format('0.00') + '%' : '-'}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-gray-500">买入区间：</span>
-                      <span className="text-gray-400">{item.price_range || '-'}</span>
+
+                    {/* 第三行：操作按钮 */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEdit(item)}
+                        className="flex-1 px-2 py-1.5 text-xs bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] rounded transition-colors"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        onClick={() => handleAddToPortfolio(item)}
+                        className="flex-1 px-2 py-1.5 text-xs bg-[#00ffff]/10 border border-[#00ffff]/30 text-[#00ffff] rounded transition-colors"
+                      >
+                        关注
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id, item.name)}
+                        className="flex-1 px-2 py-1.5 text-xs bg-[#ff3333]/10 border border-[#ff3333]/30 text-[#ff3333] rounded transition-colors"
+                      >
+                        删除
+                      </button>
                     </div>
-                    <div>
-                      <span className="text-gray-500">止盈位：</span>
-                      <span className="text-[#ff3333]">{item.first_profit_price || '-'}</span>
+                  </div>
+
+                  {/* Secondary Info - Responsive */}
+                  <div className="mt-3 pt-3 border-t border-[#2a2a3a]">
+                    {/* 桌面端 */}
+                    <div className="hidden md:flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                      <div>
+                        <span className="text-gray-500">板块：</span>
+                        <span className="text-gray-400">{item.sector || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">策略：</span>
+                        <span className="text-gray-400">{item.strategy || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">买入区间：</span>
+                        <span className="text-gray-400">{item.price_range || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">止盈位：</span>
+                        <span className="text-[#ff3333]">{item.first_profit_price || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">止损位：</span>
+                        <span className="text-[#33ff33]">{item.stop_loss_price || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">仓位：</span>
+                        <span className="text-gray-400">{item.position_pct || '-'}</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-gray-500">止损位：</span>
-                      <span className="text-[#33ff33]">{item.stop_loss_price || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">仓位：</span>
-                      <span className="text-gray-400">{item.position_pct || '-'}</span>
+
+                    {/* 移动端：两列布局 */}
+                    <div className="md:hidden grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <div>
+                        <span className="text-gray-500">板块：</span>
+                        <span className="text-gray-400">{item.sector || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">策略：</span>
+                        <span className="text-gray-400">{item.strategy || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">买入区间：</span>
+                        <span className="text-gray-400">{item.price_range || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">止盈位：</span>
+                        <span className="text-[#ff3333]">{item.first_profit_price || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">止损位：</span>
+                        <span className="text-[#33ff33]">{item.stop_loss_price || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">仓位：</span>
+                        <span className="text-gray-400">{item.position_pct || '-'}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
