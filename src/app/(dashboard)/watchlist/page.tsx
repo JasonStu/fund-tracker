@@ -1,7 +1,7 @@
 // src/app/(dashboard)/watchlist/page.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { apiClient } from '@/lib/api/client';
 import { useTranslations } from 'next-intl';
 import numeral from 'numeral';
@@ -49,91 +49,123 @@ export default function WatchlistPage() {
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [refreshingStocks, setRefreshingStocks] = useState<Set<string>>(new Set());
 
-  const fetchList = async () => {
+  // 使用 ref 存储缓存和状态，避免触发 re-render
+  const priceCacheRef = useRef<Map<string, { price: number; timestamp: number }>>(new Map());
+  const isFetchingRef = useRef(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 获取列表数据
+  const fetchList = useCallback(async () => {
     try {
       const res = await apiClient.get<{ list: WatchlistItem[] }>('/watchlist');
-      setList(res.data?.list || []);
+      const newList = res.data?.list || [];
+
+      // 获取价格并更新列表（不触发 re-render 的缓存更新）
+      const listWithPrices = await fetchPricesForList(newList, true);
+      setList(listWithPrices);
     } catch (e) {
       console.error('Failed to fetch watchlist', e);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchList();
   }, []);
 
-  // 使用 ref 存储 priceCache，避免触发 useEffect 重新执行
-  const priceCacheRef = useRef<Map<string, { price: number; timestamp: number }>>(new Map());
-
-  // 获取实时股价和计算价差（带缓存逻辑）
+  // 加载初始数据
   useEffect(() => {
-    if (list.length === 0) return;
+    fetchList();
 
-    const fetchPrices = async (stockCode?: string) => {
-      const stocksToFetch = stockCode
-        ? [list.find(item => item.code === stockCode)].filter(Boolean)
-        : list;
+    // 设置定时刷新（每60秒）
+    intervalRef.current = setInterval(() => {
+      fetchList();
+    }, 60000);
 
-      // 使用 Promise.allSettled 确保即使某个股票获取失败也不影响其他股票
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [fetchList]);
+
+  // 为列表中的所有股票获取价格
+  const fetchPricesForList = async (items: WatchlistItem[], isInitial = false): Promise<WatchlistItem[]> => {
+    if (isFetchingRef.current && !isInitial) {
+      return items;
+    }
+
+    isFetchingRef.current = true;
+
+    try {
       const results = await Promise.allSettled(
-        stocksToFetch.map(async (item) => {
+        items.map(async (item) => {
           try {
-            const price = await getStockPrice(item!.code);
-            // 只有获取到有效价格时才更新
-            if (price !== null && item!.registered_price) {
-              const priceDiff = ((price - item!.registered_price) / item!.registered_price) * 100;
-              // 更新缓存（使用 ref 避免触发 useEffect）
-              priceCacheRef.current.set(item!.code, { price, timestamp: Date.now() });
-              return { ...item!, current_price: price, price_diff: priceDiff, isStale: false };
+            const price = await getStockPrice(item.code);
+
+            if (price !== null && item.registered_price) {
+              const priceDiff = ((price - item.registered_price) / item.registered_price) * 100;
+              priceCacheRef.current.set(item.code, { price, timestamp: Date.now() });
+              return { ...item, current_price: price, price_diff: priceDiff, isStale: false };
             }
-            // 如果价格获取失败，检查缓存
-            const cached = priceCacheRef.current.get(item!.code);
-            if (cached && item!.registered_price) {
-              const priceDiff = ((cached.price - item!.registered_price) / item!.registered_price) * 100;
-              return { ...item!, current_price: cached.price, price_diff: priceDiff, isStale: true };
+
+            // 尝试使用缓存
+            const cached = priceCacheRef.current.get(item.code);
+            if (cached && item.registered_price) {
+              const priceDiff = ((cached.price - item.registered_price) / item.registered_price) * 100;
+              return { ...item, current_price: cached.price, price_diff: priceDiff, isStale: true };
             }
-            // 无缓存，保持原值
-            return { ...item!, isStale: true };
+
+            return { ...item, isStale: true };
           } catch (error) {
-            console.error(`Fetch price failed for ${item!.code}:`, error);
-            // 检查缓存
-            const cached = priceCacheRef.current.get(item!.code);
-            if (cached && item!.registered_price) {
-              const priceDiff = ((cached.price - item!.registered_price) / item!.registered_price) * 100;
-              return { ...item!, current_price: cached.price, price_diff: priceDiff, isStale: true };
+            console.error(`Fetch price failed for ${item.code}:`, error);
+            const cached = priceCacheRef.current.get(item.code);
+            if (cached && item.registered_price) {
+              const priceDiff = ((cached.price - item.registered_price) / item.registered_price) * 100;
+              return { ...item, current_price: cached.price, price_diff: priceDiff, isStale: true };
             }
-            return { ...item!, isStale: true };
+            return { ...item, isStale: true };
           }
         })
       );
 
-      // 提取成功的结果
-      const updatedList = results
+      return results
         .filter((result): result is PromiseFulfilledResult<WatchlistItem> => result.status === 'fulfilled')
         .map(result => result.value);
+    } finally {
+      isFetchingRef.current = false;
+    }
+  };
 
-      if (stockCode) {
-        // 单个刷新，更新对应项
-        setList(prev => prev.map(item => {
-          const updated = updatedList.find(u => u.code === item.code);
-          return updated || item;
-        }));
-        setRefreshingStocks(prev => {
-          const next = new Set(prev);
-          next.delete(stockCode);
-          return next;
-        });
+  // 手动刷新单个股票价格
+  const refreshStockPrice = useCallback(async (code: string) => {
+    setRefreshingStocks(prev => new Set(prev).add(code));
+
+    try {
+      const price = await getStockPrice(code);
+      const item = list.find(i => i.code === code);
+
+      if (!item) return;
+
+      if (price !== null && item.registered_price) {
+        const priceDiff = ((price - item.registered_price) / item.registered_price) * 100;
+        priceCacheRef.current.set(code, { price, timestamp: Date.now() });
+
+        setList(prev => prev.map(i =>
+          i.code === code ? { ...i, current_price: price, price_diff: priceDiff, isStale: false } : i
+        ));
       } else {
-        setList(updatedList);
+        // 保持原有数据
+        setList(prev => prev.map(i =>
+          i.code === code ? { ...i, isStale: true } : i
+        ));
       }
-    };
-
-    fetchPrices();
-    const interval = setInterval(fetchPrices, 60000); // 每60秒刷新
-
-    return () => clearInterval(interval);
+    } catch (error) {
+      console.error(`Refresh price failed for ${code}:`, error);
+    } finally {
+      setRefreshingStocks(prev => {
+        const next = new Set(prev);
+        next.delete(code);
+        return next;
+      });
+    }
   }, [list]);
 
   const handleDelete = (id: string, name: string) => {
@@ -245,8 +277,7 @@ export default function WatchlistPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setRefreshingStocks(prev => new Set(prev).add(item.code));
-                                fetchPrices(item.code);
+                                refreshStockPrice(item.code);
                               }}
                               disabled={refreshingStocks.has(item.code)}
                               className="p-1 text-gray-500 hover:text-[#FFD700] transition-colors"
@@ -320,8 +351,7 @@ export default function WatchlistPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setRefreshingStocks(prev => new Set(prev).add(item.code));
-                                fetchPrices(item.code);
+                                refreshStockPrice(item.code);
                               }}
                               disabled={refreshingStocks.has(item.code)}
                               className="p-1 text-gray-500 hover:text-[#FFD700] transition-colors"
