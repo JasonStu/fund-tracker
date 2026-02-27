@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { apiClient } from '@/lib/api/client';
 import { Combobox } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
@@ -510,6 +510,8 @@ export default function Home() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyPosition, setHistoryPosition] = useState<{ code: string; name: string; type: InvestmentType } | null>(null);
   const [activeTab, setActiveTab] = useState<'fund' | 'stock'>('fund');
+  const isInitialMount = useRef(true);
+  const isFetching = useRef(false);
 
   // 添加持仓的 API hook
   const { loading: addingPosition, execute: addPosition } = useApi(
@@ -518,7 +520,7 @@ export default function Home() {
     },
     {
       onSuccess: () => {
-        fetchPositions();
+        fetchPositions(true);
         setAddModalOpen(false);
         setPendingResult(null);
       },
@@ -532,7 +534,7 @@ export default function Home() {
     },
     {
       onSuccess: () => {
-        fetchPositions();
+        fetchPositions(true);
         setDeleteConfirmOpen(false);
         setPendingDelete(null);
       },
@@ -546,7 +548,7 @@ export default function Home() {
     },
     {
       onSuccess: () => {
-        fetchPositions();
+        fetchPositions(true);
         setTxModalOpen(false);
         setSelectedPosition(null);
       },
@@ -590,12 +592,19 @@ export default function Home() {
         })) });
       } catch (e) {
         console.error('Failed to save sort order', e);
-        await fetchPositions();
+        await fetchPositions(true);
       }
     }
   };
 
-  const fetchPositions = async () => {
+  const fetchPositions = async (isManual = false) => {
+    if (!isManual && isFetching.current) {
+      console.log('[Home] Already fetching positions, skipping...');
+      return;
+    }
+
+    console.log('[Home] Fetching positions...');
+    isFetching.current = true;
     setLoading(true);
     try {
       const res = await apiClient.get<{ positions: Position[]; transactions: Transaction[] }>('/user-funds');
@@ -605,6 +614,7 @@ export default function Home() {
       console.error('Failed to fetch positions', e);
     } finally {
       setLoading(false);
+      isFetching.current = false;
     }
   };
 

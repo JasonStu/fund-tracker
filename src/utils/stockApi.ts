@@ -1,9 +1,9 @@
 // src/utils/stockApi.ts
 
-// 东方财富API速率限制：每分钟约20次请求
+// 腾讯API速率限制：无明显限制，但建议适当控制请求频率
 // 使用信号量控制请求频率
 let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 3000; // 每次请求间隔3秒，确保每分钟不超过20次
+const MIN_REQUEST_INTERVAL = 500; // 每次请求间隔500ms
 const REQUEST_DELAY_BETWEEN_BATCH = 100; // 批量请求间隔
 
 // 全局限流锁
@@ -11,7 +11,7 @@ let rateLimitLock = false;
 
 /**
  * 获取股票价格（带速率限制）
- * 东方财富限制：每分钟约20次请求
+ * 腾讯API
  */
 export async function getStockPrice(code: string): Promise<number | null> {
   // 等待锁释放
@@ -56,20 +56,20 @@ export async function getStockPrices(codes: string[]): Promise<Map<string, numbe
   return results;
 }
 
-// 实际获取价格的函数
+// 实际获取价格的函数 - 腾讯API
 async function fetchStockPrice(code: string): Promise<number | null> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const secId = getSecId(code);
+    const qCode = getTencentCode(code);
     const response = await fetch(
-      `https://push2.eastmoney.com/api/qt/stock/get?secid=${secId}&fields=f43,f44,f45,f46,f47,f48,f49,f50,f51,f52,f57,f58,f59,f60,f169,f170,f171`,
+      `https://qt.gtimg.cn/q=${qCode}`,
       {
         signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Referer': 'https://quote.eastmoney.com/',
+          'Referer': 'https://finance.qq.com/',
           'Accept': '*/*',
           'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
         },
@@ -77,32 +77,36 @@ async function fetchStockPrice(code: string): Promise<number | null> {
     );
     clearTimeout(timeoutId);
 
-    // 处理500错误
-    if (response.status === 500 || response.status === 502 || response.status === 503) {
-      console.warn(`东方财富API返回${response.status}，可能被限流`);
-      return null;
-    }
-
     if (!response.ok) {
       console.error('获取股票价格失败:', response.status);
       return null;
     }
 
-    const data = await response.json();
-
-    // 检查API返回错误
-    if (data.rc && data.rc !== 0) {
-      console.error('东方财富API返回错误:', data);
-      return null;
-    }
+    const text = await response.text();
 
     // 检查是否返回有效数据
-    if (!data.data || data.data.f43 === undefined || data.data.f43 === null) {
-      console.error('无效的股票数据:', data);
+    if (!text || text.trim() === '' || text === 'null') {
+      console.error('无效的股票数据:', text);
       return null;
     }
 
-    return data.data.f43 / 100;
+    // 腾讯API返回格式: v_sh600519="1~贵州茅台~600519~1491.66~1466.80~1470.00~..."
+    // 字段说明: 索引3=当前价格, 索引4=昨收, 索引5=开盘
+    const parts = text.match(/="([^"]+)"/);
+    if (!parts || !parts[1]) {
+      console.error('无法解析腾讯API返回数据:', text);
+      return null;
+    }
+
+    const fields = parts[1].split('~');
+    const price = parseFloat(fields[3]); // 索引3是当前价格
+
+    if (isNaN(price) || price <= 0) {
+      console.error('无效的股票价格:', fields[5], '原始数据:', text);
+      return null;
+    }
+
+    return price;
   } catch (error: unknown) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
@@ -114,10 +118,11 @@ async function fetchStockPrice(code: string): Promise<number | null> {
   }
 }
 
-function getSecId(code: string): string {
-  // 沪市: 1.0, 深市: 0.0, 创业板: 0.3, 科创板: 1.688
+function getTencentCode(code: string): string {
+  // 沪市: sh + 股票代码
   if (code.startsWith('6') || code.startsWith('5') || code.startsWith('688')) {
-    return `1.${code}`;
+    return `sh${code}`;
   }
-  return `0.${code}`;
+  // 深市: sz + 股票代码
+  return `sz${code}`;
 }

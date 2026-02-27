@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 
+// 东方财富API速率限制
+let lastRequestTime = 0;
+const MIN_REQUEST_INTERVAL = 3000; // 每次请求间隔3秒
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get('code');
@@ -37,6 +41,14 @@ export async function GET(request: NextRequest) {
   const klt = periodMap[period] || 101;
 
   try {
+    // 速率限制
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
+    if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+      await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL - timeSinceLastRequest));
+    }
+    lastRequestTime = Date.now();
+
     // 东方财富 K线 API
     const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?` +
       `secid=${market}.${code}&` +

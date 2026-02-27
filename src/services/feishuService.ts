@@ -72,7 +72,7 @@ export async function getTenantAccessToken(): Promise<string> {
     tokenExpiry = Date.now() + (data.expire - 60) * 1000;
     console.log('[Feishu] Token cached, expires at:', new Date(tokenExpiry));
 
-    return cachedToken;
+    return cachedToken!;
   } catch (error) {
     console.error('[Feishu] Token fetch error:', error);
     throw error;

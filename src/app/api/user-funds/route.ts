@@ -34,12 +34,12 @@ async function getFundRealtimeValuation(fundCode: string) {
   };
 }
 
-// 东方财富API速率限制
+// 腾讯API速率限制
 let stockRequestCount = 0;
 let stockLastRequestTime = 0;
-const STOCK_MIN_REQUEST_INTERVAL = 3000; // 每次请求间隔3秒
+const STOCK_MIN_REQUEST_INTERVAL = 500; // 每次请求间隔500ms
 
-// Helper to fetch stock realtime price from EastMoney
+// Helper to fetch stock realtime price from Tencent
 async function getStockRealtimePrice(stockCode: string) {
   // 速率限制
   const now = Date.now();
@@ -51,50 +51,55 @@ async function getStockRealtimePrice(stockCode: string) {
   stockRequestCount++;
 
   try {
-    // Convert to market code format
-    let market = '';
-    if (stockCode.startsWith('6')) {
-      market = '1'; // Shanghai
-    } else if (stockCode.startsWith('0') || stockCode.startsWith('3')) {
-      market = '0'; // Shenzhen
+    // Convert to Tencent code format
+    let tencentCode = '';
+    if (stockCode.startsWith('6') || stockCode.startsWith('5') || stockCode.startsWith('688')) {
+      tencentCode = `sh${stockCode}`; // 上海
+    } else {
+      tencentCode = `sz${stockCode}`; // 深圳
     }
 
-    const url = `https://push2.eastmoney.com/api/qt/stock/get?` +
-      `fields=f43,f57,f58,f86,f204,f205,f169,f170&` +
-      `fltt=2&` +
-      `invt=2&` +
-      `secid=${market}.${stockCode}`;
-
+    const url = `https://qt.gtimg.cn/q=${tencentCode}`;
     const response = await axios.get(url, { timeout: 10000 });
 
-    // 处理500错误
-    if (response.status === 500 || response.status === 502 || response.status === 503) {
-      console.warn(`东方财富API返回${response.status}，可能被限流`);
+    if (!response.data || response.data.trim() === '' || response.data === 'null') {
+      console.warn(`腾讯API返回无效数据: ${stockCode}`);
       return null;
     }
 
-    const data = response.data;
-
-    if (data && data.data) {
-      const f43 = parseFloat(data.data.f43) || 0; // Current price in 分
-      const f86 = parseFloat(data.data.f86) || 0; // Volume
-      const f169 = parseFloat(data.data.f169) || 0; // 涨跌额 (change amount in 分)
-      const f170 = parseFloat(data.data.f170) || 0; // 涨跌幅% (change percent)
-
-      // 检查是否返回有效数据
-      if (f43 === 0) {
-        console.warn(`股票 ${stockCode} 价格数据无效`);
-        return null;
-      }
-
-      return {
-        currentPrice: f43 / 100, // 转换为元
-        previousClose: (f43 - f169) / 100, // 从当前价和涨跌额计算昨收价
-        change: f169 / 100, // 转换为元
-        changePercent: f170,
-        volume: f86,
-      };
+    const text = response.data;
+    // 腾讯API返回格式: v_sh600519="1~贵州茅台~600519~1491.66~1466.80~1470.00~..."
+    // 字段说明: 索引3=当前价格, 索引4=昨收, 索引5=开盘, 索引6=成交量
+    const match = text.match(/="([^"]+)"/);
+    if (!match || !match[1]) {
+      console.error('无法解析腾讯API返回数据:', text);
+      return null;
     }
+
+    const fields = match[1].split('~');
+    // 腾讯API字段:
+    // 索引3=当前价格, 索引4=昨收, 索引5=今开, 索引6=成交量
+    // 索引31=涨跌, 索引32=涨跌%
+    const currentPrice = parseFloat(fields[3]) || 0;
+    const previousClose = parseFloat(fields[4]) || 0;
+    const openPrice = parseFloat(fields[5]) || 0;
+    const volume = parseFloat(fields[6]) || 0;
+    const change = parseFloat(fields[31]) || 0;
+    const changePercent = parseFloat(fields[32]) || 0;
+
+    // 检查是否返回有效数据
+    if (currentPrice === 0 || previousClose === 0) {
+      console.warn(`股票 ${stockCode} 价格数据无效: current=${currentPrice}, previous=${previousClose}`);
+      return null;
+    }
+
+    return {
+      currentPrice,
+      previousClose,
+      change,
+      changePercent, // 涨跌幅百分比，如 1.23 表示 1.23%
+      volume,
+    };
   } catch (error) {
     console.error(`Fetch stock ${stockCode} price failed:`, error);
   }
@@ -220,6 +225,20 @@ export async function GET() {
     // Calculate positions with FIFO method
     const positionsWithValue = positions.map((position, index) => {
       const valuation = valuations[index];
+      type StockValuation = {
+        currentPrice: number;
+        previousClose: number;
+        change: number;
+        changePercent: number;
+        volume: number;
+      } | null;
+      type FundValuation = {
+        nav: number;
+        estimatedNav: number;
+        estimatedChange: number;
+        estimatedChangePercent: number;
+        calculationTime: string;
+      } | null;
 
       // Get all transactions for this position
       const positionTransactions = (transactions || [])
@@ -293,24 +312,24 @@ export async function GET() {
 
       const realizedProfit = totalSell - realizedCost;
       const estimatedNav = position.type === 'stock'
-        ? (valuation as any)?.currentPrice || 0
-        : (valuation as any)?.estimatedNav || 0;
+        ? ((valuation as StockValuation)?.currentPrice ?? 0)
+        : ((valuation as FundValuation)?.estimatedNav ?? 0);
       const unrealizedProfit = (currentShares * estimatedNav) - remainingCost;
       const totalProfit = realizedProfit + unrealizedProfit;
 
       const currentValue = currentShares * estimatedNav;
       const estimatedChange = position.type === 'stock'
-        ? (valuation as any)?.change || 0
-        : (valuation as any)?.estimatedChange || 0;
+        ? ((valuation as StockValuation)?.change ?? 0)
+        : ((valuation as FundValuation)?.estimatedChange ?? 0);
       const estimatedChangePercent = position.type === 'stock'
-        ? (valuation as any)?.changePercent || 0
-        : (valuation as any)?.estimatedChangePercent || 0;
+        ? ((valuation as StockValuation)?.changePercent ?? 0)
+        : ((valuation as FundValuation)?.estimatedChangePercent ?? 0);
 
       return {
         ...position,
         nav: position.type === 'stock'
-          ? (valuation as any)?.previousClose || 0
-          : (valuation as any)?.nav || 0,
+          ? ((valuation as StockValuation)?.currentPrice ?? 0)
+          : ((valuation as FundValuation)?.nav ?? 0),
         estimatedNav,
         estimatedChange,
         estimatedChangePercent,

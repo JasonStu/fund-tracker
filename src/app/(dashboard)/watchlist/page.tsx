@@ -27,7 +27,7 @@ interface WatchlistItem {
   registered_price: number;
   current_price?: number;
   price_diff?: number;
-  isStale?: boolean;
+  isStale: boolean;
 }
 
 const TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
